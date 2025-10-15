@@ -1,12 +1,23 @@
 import sys
 import os
+import html
+import subprocess
+import re
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QFrame, QLabel, QScrollArea,
-    QDialog, QLineEdit, QFileDialog, QMessageBox
+    QPushButton, QFrame, QPlainTextEdit, QLabel, QScrollArea,
+    QDialog, QLineEdit, QFileDialog, QMessageBox , QTextEdit
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint, QProcess
-from PyQt6.QtGui import QGuiApplication, QWindow
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtGui import QTextCursor, QGuiApplication
+from PyQt6.QtCore import QThread, pyqtSignal
+
+ANSI_SGR_COLORS = {
+        30: "black", 31: "red", 32: "green", 33: "orange", 34: "blue",
+        35: "magenta", 36: "cyan", 37: "lightgray", 90: "gray",
+        91: "lightcoral", 92: "lightgreen", 93: "yellow", 94: "lightskyblue",
+        95: "plum", 96: "paleturquoise", 97: "white"
+    }
 
 
 class InitialSetupDialog(QDialog):
@@ -64,9 +75,11 @@ class InitialSetupDialog(QDialog):
         btn_h.addWidget(self.submit_btn)
         layout.addLayout(btn_h)
 
+        # Result storage
         self.result = None
 
     def center(self, parent):
+        """Center the dialog on parent if available, otherwise on primary screen."""
         if parent is not None:
             parent_rect = parent.frameGeometry()
             parent_center = parent_rect.center()
@@ -120,7 +133,7 @@ class ModernDarkTerminalApp(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Setup dialog
+        # Show setup dialog first
         setup = InitialSetupDialog(self)
         if setup.exec() != QDialog.DialogCode.Accepted:
             sys.exit(0)
@@ -131,7 +144,11 @@ class ModernDarkTerminalApp(QMainWindow):
         self.output_dir = res["output_dir"]
         self.output_filename = res["output_name"]
 
-        os.chdir(self.output_dir)
+        # set cwd to output directory
+        try:
+            os.chdir(self.output_dir)
+        except Exception:
+            pass
 
         self.setWindowTitle("Modern Dark Terminal App")
         self.showFullScreen()
@@ -142,7 +159,7 @@ class ModernDarkTerminalApp(QMainWindow):
         self.main_layout = QVBoxLayout()
         self.central_widget.setLayout(self.main_layout)
 
-        # Top bar
+        # Top bar: left domain, right window controls
         self.top_bar = QFrame()
         self.top_bar.setFixedHeight(40)
         self.top_bar.setStyleSheet("background-color: #1F1F2E;")
@@ -179,7 +196,7 @@ class ModernDarkTerminalApp(QMainWindow):
         top_layout.addWidget(self.btn_max)
         top_layout.addWidget(self.btn_close)
 
-        # Container
+        # Container (sidebar + terminal)
         self.container = QFrame()
         self.container_layout = QHBoxLayout()
         self.container.setLayout(self.container_layout)
@@ -210,10 +227,12 @@ class ModernDarkTerminalApp(QMainWindow):
         self.sidebar_layout.addWidget(self.toggle_btn)
         self.sidebar_layout.addSpacing(8)
 
+        # Header label
         self.header_label = QLabel("")
         self.header_label.setStyleSheet("color: white; font-weight: bold; padding: 5px;")
         self.sidebar_layout.addWidget(self.header_label)
 
+        # Scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_content = QWidget()
@@ -222,20 +241,34 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_area.setWidget(self.scroll_content)
         self.sidebar_layout.addWidget(self.scroll_area)
 
+        # Main menu buttons
         self.main_buttons = ["Fuzzer", "HTTPX", "Subfinder", "Nuclei", "DNSX"]
         self.add_main_buttons()
         self.container_layout.addWidget(self.sidebar)
 
-        # Terminal container
-        self.terminal_container = QWidget()
-        self.terminal_layout = QVBoxLayout()
-        self.terminal_container.setLayout(self.terminal_layout)
-        self.container_layout.addWidget(self.terminal_container)
+        # Terminal
+        self.main_content = QFrame()
+        self.main_content.setStyleSheet("background-color: #2E2E3E;")
+        self.main_layout_content = QVBoxLayout()
+        self.main_content.setLayout(self.main_layout_content)
 
-        # Embed xterm
-        self.embed_terminal()
+        self.terminal = QTextEdit()
+        self.terminal.setAcceptRichText(True)
+        self.terminal.setStyleSheet("""
+            QPlainTextEdit {
+                background-color: #121212;
+                color: #00FF00;
+                font-family: "Courier New";
+                font-size: 14px;
+                border: none;
+            }
+        """)
+        self.terminal.setReadOnly(False)
+        self.terminal.installEventFilter(self)
+        self.main_layout_content.addWidget(self.terminal)
+        self.container_layout.addWidget(self.main_content)
 
-        # Add top bar and container
+        # Put together
         self.main_layout.addWidget(self.top_bar)
         self.main_layout.addWidget(self.container)
 
@@ -245,11 +278,13 @@ class ModernDarkTerminalApp(QMainWindow):
         self.sidebar_animation.setEasingCurve(QEasingCurve.Type.InOutQuart)
         self.sidebar_expanded = True
 
-    def embed_terminal(self):
-        # Create xterm inside terminal_container
-        self.xterm_process = QProcess(self)
-        # "-into" embeds the xterm inside QWidget
-        self.xterm_process.start("xterm", ["-into", str(int(self.terminal_container.winId())), "-geometry", "120x40"])
+        # Terminal data
+        self.process = None
+        self.history = []
+        self.history_index = -1
+        self.username = os.getlogin() if hasattr(os, "getlogin") else "user"
+        self.cwd = os.getcwd()
+        self.show_prompt()
 
     def add_main_buttons(self):
         for i in reversed(range(self.scroll_layout.count())):
@@ -292,6 +327,219 @@ class ModernDarkTerminalApp(QMainWindow):
         self.sidebar_animation.start()
         self.sidebar_expanded = not self.sidebar_expanded
 
+
+    def ansi_to_html(text: str) -> str:
+        """
+        Very small ANSI SGR -> HTML converter.
+        Handles sequences like \x1b[31m (red) and \x1b[0m (reset) and bold (1).
+        Other sequences are removed.
+        """
+        # escape html first
+        text = html.escape(text)
+        # regex to find SGR params
+        sgr_re = re.compile(r'\\x1B\\[([0-9;]*)m')
+        parts = []
+        last_pos = 0
+        open_spans = []
+
+        for m in sgr_re.finditer(text):
+            start, end = m.span()
+            params = m.group(1)
+            # append text before this escape
+            parts.append(text[last_pos:start])
+            last_pos = end
+
+            if params == '' or params == '0':
+                # reset -> close all open spans
+                while open_spans:
+                    parts.append("</span>")
+                    open_spans.pop()
+            else:
+                attrs = params.split(';')
+                style_attrs = []
+                for a in attrs:
+                    try:
+                        ai = int(a)
+                    except:
+                        continue
+                    if ai == 1:
+                        style_attrs.append("font-weight:700")
+                    elif 30 <= ai <= 37 or 90 <= ai <= 97:
+                        color = ANSI_SGR_COLORS.get(ai, None)
+                        if color:
+                            style_attrs.append(f"color:{color}")
+                    elif ai == 39:
+                        # default fg
+                        pass
+                if style_attrs:
+                    parts.append(f"<span style=\"{';'.join(style_attrs)}\">")
+                    open_spans.append(True)
+
+        parts.append(text[last_pos:])
+        # close any remaining spans
+        while open_spans:
+            parts.append("</span>")
+            open_spans.pop()
+        return ''.join(parts).replace('\\n', '<br/>').replace('  ', '&nbsp;&nbsp;')
+
+
+    # ------------------ terminal UI helpers & handlers ------------------
+    def show_prompt(self):
+        """Append a prompt line using HTML so colors/formatting can be used."""
+        self.cwd = os.getcwd()
+        prompt = f'<span style="color:#9EA7FF;font-weight:600;">{html.escape(self.username)}</span>' \
+                f'@<span style="color:#7B61FF;font-weight:600;">{html.escape(self.domain)}</span>:' \
+                f'<span style="color:#A6A6A6;">{html.escape(self.cwd)}</span>$ '
+        # ensure cursor at end then insert prompt as HTML block
+        self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+        self.terminal.insertHtml(prompt)
+        self.terminal.insertPlainText('')  # keep cursor after HTML
+        self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+
+    def replace_current_line(self, text):
+        """
+        Replace current input area (last block) with the provided text (keeps prompt).
+        Works by selecting the last block and replacing it.
+        """
+        cursor = self.terminal.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        # select last block
+        cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+        # get current block text to detect prompt boundary if present
+        block_text = cursor.selectedText()
+        # If prompt visible in block, we will replace after prompt; otherwise replace whole block
+        if '$' in block_text:
+            # split at last $ to preserve prompt
+            idx = block_text.rfind('$')
+            prompt_part = block_text[:idx+1]
+            # replace: set the block to prompt_part + our text (escape HTML)
+            new_block = html.escape(prompt_part) + ' ' + html.escape(text)
+            cursor.removeSelectedText()
+            cursor.insertHtml(new_block)
+        else:
+            cursor.removeSelectedText()
+            cursor.insertHtml(html.escape(text))
+        self.terminal.setTextCursor(cursor)
+        self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+
+    def eventFilter(self, source, event):
+        """
+        Handle Enter key to capture the command and run worker; handle Ctrl+L to clear.
+        This avoids double-handling and ensures we read only the typed part.
+        """
+        if source == self.terminal and event.type() == event.Type.KeyPress:
+            key = event.key()
+            mods = event.modifiers()
+            if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
+                # grab last block (user input)
+                cursor = self.terminal.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                block_text = cursor.selectedText()
+                # assume the command is text after the last '$'
+                if '$' in block_text:
+                    command = block_text.split('$')[-1].strip()
+                else:
+                    command = block_text.strip()
+                if command:
+                    # append newline so output appears on new line below prompt
+                    self.terminal.append("")  # move to new block
+                    # store history
+                    self.history.append(command)
+                    self.history_index = len(self.history)
+                    # Start worker thread
+                    self.current_worker = CommandWorker(command, cwd=self.output_dir)
+                    self.current_worker.output_signal.connect(self.handle_output)
+                    # when finished, show prompt (use finished_signal to be consistent)
+                    self.current_worker.finished_signal.connect(self.show_prompt)
+                    self.current_worker.start()
+                return True
+
+            if key == Qt.Key.Key_L and mods == Qt.KeyboardModifier.ControlModifier:
+                self.terminal.clear()
+                self.show_prompt()
+                return True
+        return False
+    
+    def ansi_to_html(self, text: str) -> str:
+        ANSI_SGR_COLORS = {
+            30: "black", 31: "red", 32: "green", 33: "orange", 34: "blue",
+            35: "magenta", 36: "cyan", 37: "lightgray", 90: "gray",
+            91: "lightcoral", 92: "lightgreen", 93: "yellow", 94: "lightskyblue",
+            95: "plum", 96: "paleturquoise", 97: "white"
+        }
+
+        text = html.escape(text)
+        sgr_re = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+        parts = []
+        last_pos = 0
+        open_spans = []
+
+        for m in sgr_re.finditer(text):
+            start, end = m.span()
+            parts.append(text[last_pos:start])
+            last_pos = end
+
+            params = m.group()[2:-1]  # remove \x1b[ and m
+            if params == '' or params == '0':
+                while open_spans:
+                    parts.append("</span>")
+                    open_spans.pop()
+            else:
+                attrs = params.split(';')
+                style_attrs = []
+                for a in attrs:
+                    try:
+                        ai = int(a)
+                    except:
+                        continue
+                    if ai == 1:
+                        style_attrs.append("font-weight:700")
+                    elif 30 <= ai <= 37 or 90 <= ai <= 97:
+                        color = ANSI_SGR_COLORS.get(ai, None)
+                        if color:
+                            style_attrs.append(f"color:{color}")
+                if style_attrs:
+                    parts.append(f"<span style=\"{';'.join(style_attrs)}\">")
+                    open_spans.append(True)
+
+        parts.append(text[last_pos:])
+        while open_spans:
+            parts.append("</span>")
+            open_spans.pop()
+        return ''.join(parts).replace('\n', '<br/>').replace('  ', '&nbsp;&nbsp;')
+
+
+    def handle_output(self, raw_text):
+        """
+        Accepts raw_text (may contain ANSI escapes and \\r). Converts ANSI to HTML and appends.
+        If it contains carriage-return sequences, update the last line (in-place) to mimic progress bars.
+        """
+        if raw_text is None:
+            return
+        # normalize tabs/newlines
+        text = raw_text.replace('\t', '    ')
+        # If there is a CR without LF, it's a progress update
+        if '\r' in text and not text.endswith('\n'):
+            # take last seg after last \r
+            last_seg = text.split('\r')[-1]
+            html_seg = self.ansi_to_html(last_seg)
+            # replace last block (progress line) with html_seg
+            cursor = self.terminal.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            # select the last block under cursor and replace it
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            cursor.removeSelectedText()
+            cursor.insertHtml(html_seg)
+            self.terminal.setTextCursor(cursor)
+        else:
+            # normal line(s) -> convert ANSI and append as HTML
+            html_line = self.ansi_to_html(text)
+            # ensure a newline separation if needed
+            self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+            self.terminal.insertHtml(html_line + '<br/>')
+            self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+
     def open_subpage(self, tool_name):
         self.header_label.setText(f"Now inside {tool_name}")
         for i in reversed(range(self.scroll_layout.count())):
@@ -299,9 +547,18 @@ class ModernDarkTerminalApp(QMainWindow):
             if widget:
                 widget.setParent(None)
         option_labels = [
-            "FFUF Dirs", "Option 2", "Option 3", "Option 4", "Option 5",
-            "Option 6", "Option 7", "Option 8", "Option 9", "Option 10"
+            "FFUF Dirs",      # Option 1 — change this string to whatever name you want
+            "Option 2",
+            "Option 3",
+            "Option 4",
+            "Option 5",
+            "Option 6",
+            "Option 7",
+            "Option 8",
+            "Option 9",
+            "Option 10"
         ]
+
         for idx, label in enumerate(option_labels, start=1):
             btn = QPushButton(label)
             btn.setStyleSheet("""
@@ -317,10 +574,10 @@ class ModernDarkTerminalApp(QMainWindow):
                     background-color: #7B61FF;
                 }
             """)
+            # keep original binding: pass the option index and tool name to handler
             btn.clicked.connect(lambda checked, i=idx, t=tool_name: self.on_option_click(t, i))
             self.scroll_layout.addWidget(btn)
-
-        back_btn = QPushButton("Back")
+            back_btn = QPushButton("Back")
         back_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF5555;
@@ -337,11 +594,63 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_layout.addWidget(back_btn)
 
     def on_option_click(self, tool_name, option_index):
-        print(f"[DEBUG] {tool_name} option {option_index} clicked")
+        """
+        If Fuzzer + Option 1 -> build ffuf command using setup values
+        and insert it into the CLI (does NOT execute).
+        For other options/tools, insert a template command into the prompt.
+        """
+        if tool_name.lower() == "fuzzer" and option_index == 1:
+            domain = self.domain.strip().rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            # build the ffuf command (escaped/quoted)
+            cmd = f'ffuf -u "{url}" -w "{wordlist}" -t 50 -o "{output_path}" -of json'
 
+            # insert command into terminal input line (does not auto-run)
+            self.replace_current_line(cmd)
+        else:
+            # default: prepare a template command and insert it
+            if tool_name.lower() == "httpx":
+                cmd = f'httpx -u {self.domain} -o {self.output_filename}'
+            else:
+                cmd = f'# {tool_name} option {option_index} (configure command)'
+            self.replace_current_line(cmd)
+    
+            
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
+class CommandWorker(QThread):
+    output_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal()
+
+    def __init__(self, command, cwd=None):
+        super().__init__()
+        self.command = command
+        self.cwd = cwd
+
+    def run(self):
+        try:
+            process = subprocess.Popen(
+                self.command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=self.cwd
+            )
+            for line in iter(process.stdout.readline, ''):
+                if line is None:
+                    break
+                self.output_signal.emit(line.rstrip('\n'))
+            process.stdout.close()
+            process.wait()
+        except Exception as e:
+            self.output_signal.emit(f"[Error] {str(e)}")
+        finally:
+            self.finished_signal.emit()
+
 
 
 if __name__ == "__main__":
