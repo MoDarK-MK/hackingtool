@@ -423,14 +423,29 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_layout.addWidget(back_btn)
 
     def on_option_click(self, tool_name, option_index):
-        cmd = ""
-        if tool_name.lower() == "fuzzer":
-            cmd = f"fuzzer_tool -u {self.domain} -w {self.wordlist_path} -o {self.output_filename}"
-        elif tool_name.lower() == "httpx":
-            cmd = f"httpx -u {self.domain} -o {self.output_filename}"
+        """
+        If Fuzzer + Option 1 -> build ffuf command using setup values
+        and insert it into the CLI (does NOT execute).
+        For other options/tools, insert a template command into the prompt.
+        """
+        if tool_name.lower() == "fuzzer" and option_index == 1:
+            domain = self.domain.strip().rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            # build the ffuf command (escaped/quoted)
+            cmd = f'ffuf -u "{url}" -w "{wordlist}" -t 50 -o "{output_path}" -of json'
+
+            # insert command into terminal input line (does not auto-run)
+            self.replace_current_line(cmd)
         else:
-            cmd = f"# {tool_name} option {option_index} (configure command)"
-        self.replace_current_line(cmd)
+            # default: prepare a template command and insert it
+            if tool_name.lower() == "httpx":
+                cmd = f'httpx -u {self.domain} -o {self.output_filename}'
+            else:
+                cmd = f'# {tool_name} option {option_index} (configure command)'
+            self.replace_current_line(cmd)
+
 
     def back_to_main(self):
         self.header_label.setText("")
