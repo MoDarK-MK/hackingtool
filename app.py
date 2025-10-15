@@ -429,7 +429,7 @@ class ModernDarkTerminalApp(QMainWindow):
             key = event.key()
             mods = event.modifiers()
             
-            # Enter: اجرا فرمان
+            # Enter: پردازش فرمان
             if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
                 cursor = self.terminal.textCursor()
                 cursor.movePosition(QTextCursor.MoveOperation.End)
@@ -439,14 +439,54 @@ class ModernDarkTerminalApp(QMainWindow):
                     command = block_text.split('$')[-1].strip()
                 else:
                     command = block_text.strip()
+
                 if command:
-                    self.terminal.append("")
                     self.history.append(command)
                     self.history_index = len(self.history)
-                    self.current_worker = CommandWorker(command, cwd=self.output_dir)
-                    self.current_worker.output_signal.connect(self.handle_output)
-                    self.current_worker.finished_signal.connect(self.show_prompt)
-                    self.current_worker.start()
+                    
+                    # جداسازی دستور اصلی
+                    cmd_parts = command.strip().split()
+                    cmd_base = cmd_parts[0].lower()
+                    
+                    # دستورات شبیه‌سازی‌شده
+                    if cmd_base == "clear":
+                        self.terminal.clear()
+                        self.show_prompt()
+                    elif cmd_base == "pwd":
+                        self.handle_output(self.cwd)
+                        self.show_prompt()
+                    elif cmd_base == "ls":
+                        try:
+                            items = os.listdir(self.cwd)
+                            self.handle_output('\n'.join(items))
+                        except Exception as e:
+                            self.handle_output(f"[Error] {str(e)}")
+                        self.show_prompt()
+                    elif cmd_base == "cd":
+                        if len(cmd_parts) > 1:
+                            path = os.path.abspath(os.path.join(self.cwd, cmd_parts[1]))
+                            if os.path.isdir(path):
+                                os.chdir(path)
+                                self.cwd = path
+                            else:
+                                self.handle_output(f"[Error] Directory not found: {path}")
+                        self.show_prompt()
+                    elif cmd_base == "history":
+                        hist_text = '\n'.join(self.history)
+                        self.handle_output(hist_text)
+                        self.show_prompt()
+                    elif cmd_base == "echo":
+                        self.handle_output(' '.join(cmd_parts[1:]))
+                        self.show_prompt()
+                    elif cmd_base == "exit":
+                        self.close()
+                    else:
+                        # دستور واقعی: استفاده از CommandWorker
+                        self.terminal.append("")
+                        self.current_worker = CommandWorker(command, cwd=self.output_dir)
+                        self.current_worker.output_signal.connect(self.handle_output)
+                        self.current_worker.finished_signal.connect(self.show_prompt)
+                        self.current_worker.start()
                 return True
             
             # Ctrl+L: پاک کردن ترمینال
@@ -496,6 +536,7 @@ class ModernDarkTerminalApp(QMainWindow):
                 return True
 
         return False
+
 
     def ansi_to_html(self, text: str) -> str:
         ANSI_SGR_COLORS = {
