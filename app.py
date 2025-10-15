@@ -21,7 +21,6 @@ ANSI_SGR_COLORS = {
         95: "plum", 96: "paleturquoise", 97: "white"
     }
 
-
 class InitialSetupDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -130,9 +129,9 @@ class InitialSetupDialog(QDialog):
         }
         self.accept()
 
-
 class ModernDarkTerminalApp(QMainWindow):
     def __init__(self):
+        self._last_was_output_line = False
         super().__init__()
 
         # Show setup dialog first
@@ -384,8 +383,6 @@ class ModernDarkTerminalApp(QMainWindow):
             open_spans.pop()
         return ''.join(parts).replace('\\n', '<br/>').replace('  ', '&nbsp;&nbsp;')
 
-
-    # ------------------ terminal UI helpers & handlers ------------------
     def show_prompt(self):
         """Append a prompt line using HTML so colors/formatting can be used."""
         self.cwd = os.getcwd()
@@ -397,7 +394,9 @@ class ModernDarkTerminalApp(QMainWindow):
         self.terminal.insertHtml(prompt)
         self.terminal.insertPlainText('')  # keep cursor after HTML
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
-
+        
+        self._last_was_output_line = False
+        
     def replace_current_line(self, text):
         """
         Replace current input area (last block) with the provided text (keeps prompt).
@@ -589,33 +588,127 @@ class ModernDarkTerminalApp(QMainWindow):
 
     def handle_output(self, raw_text):
         """
-        Accepts raw_text (may contain ANSI escapes and \\r). Converts ANSI to HTML and appends.
-        If it contains carriage-return sequences, update the last line (in-place) to mimic progress bars.
+        Robust output handler:
+        - '\n' -> append new output line (never overwrite previous lines)
+        - '\r' -> update last output line (or update text after prompt if prompt is present)
+        - '\x1b[2K' -> clear last output line
+        - other ANSI escapes (colors) are stripped here to avoid raw escape printing;
+            if you want colors later we can add safe html-rendering.
+        Uses self._last_was_output_line to know whether last block is an output line or a prompt.
         """
         if raw_text is None:
             return
-        # normalize tabs/newlines
+
         text = raw_text.replace('\t', '    ')
-        # If there is a CR without LF, it's a progress update
-        if '\r' in text and not text.endswith('\n'):
-            # take last seg after last \r
-            last_seg = text.split('\r')[-1]
-            html_seg = self.ansi_to_html(last_seg)
-            # replace last block (progress line) with html_seg
-            cursor = self.terminal.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
-            # select the last block under cursor and replace it
-            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
-            cursor.removeSelectedText()
-            cursor.insertHtml(html_seg)
-            self.terminal.setTextCursor(cursor)
-        else:
-            # normal line(s) -> convert ANSI and append as HTML
-            html_line = self.ansi_to_html(text)
-            # ensure a newline separation if needed
+
+        def strip_ansi_except_controls(s):
+            return re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', s)
+
+        text = text.replace('\x1b[2K', '[ESC_CLEAR_LINE]')
+
+        parts = re.split(r'(\r|\n|\[ESC_CLEAR_LINE\])', text)
+
+        def append_output_line(s):
+            # append plain text + newline
             self.terminal.moveCursor(QTextCursor.MoveOperation.End)
-            self.terminal.insertHtml(html_line + '<br/>')
+            # insertText on cursor is more reliable in PyQt6
+            cur = self.terminal.textCursor()
+            cur.movePosition(QTextCursor.MoveOperation.End)
+            cur.insertText(s + '\n')
+            self.terminal.setTextCursor(cur)
             self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+            self._last_was_output_line = True
+
+        def replace_last_output_line(s):
+            """
+            Replace the last output line. If the last block is a prompt (contains '$'),
+            preserve prompt part and replace only after it.
+            """
+            cur = self.terminal.textCursor()
+            cur.movePosition(QTextCursor.MoveOperation.End)
+            cur.select(QTextCursor.SelectionType.BlockUnderCursor)
+            block_text = cur.selectedText()
+
+            if '$' in block_text and not self._last_was_output_line:
+                # there's a prompt in the block — preserve up to last '$'
+                idx = block_text.rfind('$')
+                prompt_part = block_text[:idx+1]  # include $
+                new_block = prompt_part + ' ' + s
+                cur.removeSelectedText()
+                cur.insertText(new_block)
+            else:
+                # last block is an output line (or no prompt found) -> replace whole block
+                cur.removeSelectedText()
+                cur.insertText(s)
+            self.terminal.setTextCursor(cur)
+            self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+            self._last_was_output_line = True
+
+        def clear_last_output_line():
+            # remove the last block (output or prompt line). If it's a prompt, leave prompt only.
+            cur = self.terminal.textCursor()
+            cur.movePosition(QTextCursor.MoveOperation.End)
+            cur.select(QTextCursor.SelectionType.BlockUnderCursor)
+            block_text = cur.selectedText()
+            if '$' in block_text and not self._last_was_output_line:
+                # keep prompt only
+                idx = block_text.rfind('$')
+                prompt_part = block_text[:idx+1]  # include $
+                cur.removeSelectedText()
+                cur.insertText(prompt_part + ' ')
+            else:
+                # remove whole block (makes it empty)
+                cur.removeSelectedText()
+            self.terminal.setTextCursor(cur)
+            self.terminal.moveCursor(QTextCursor.MoveOperation.End)
+            self._last_was_output_line = False
+
+        # iterate parts and process
+        buffer = ""
+        last_was_newline = False
+        last_was_progress = False
+
+        for token in parts:
+            if token == '' or token is None:
+                continue
+            if token == '\n':
+                # finish current buffer as appended line
+                if buffer != "":
+                    # strip ANSI colors from buffer (so control sequences don't show up)
+                    clean = strip_ansi_except_controls(buffer)
+                    append_output_line(clean)
+                    buffer = ""
+                else:
+                    append_output_line('')
+                last_was_newline = True
+                last_was_progress = False
+                continue
+
+            if token == '\r':
+                if buffer != "":
+                    clean = strip_ansi_except_controls(buffer)
+                    replace_last_output_line(clean)
+                    buffer = ""
+                last_was_progress = True
+                last_was_newline = False
+                continue
+
+            if token == '[ESC_CLEAR_LINE]':
+                # clear last output line
+                clear_last_output_line()
+                buffer = ""
+                last_was_progress = False
+                last_was_newline = False
+                continue
+
+            buffer += token
+
+        if buffer != "":
+            clean = strip_ansi_except_controls(buffer)
+            if last_was_progress or (not last_was_newline and self._last_was_output_line):
+                replace_last_output_line(clean)
+            else:
+                append_output_line(clean)
 
     def open_subpage(self, tool_name):
         self.header_label.setText(f"Now inside {tool_name}")
@@ -624,9 +717,9 @@ class ModernDarkTerminalApp(QMainWindow):
             if widget:
                 widget.setParent(None)
         option_labels = [
-            "FFUF Dirs",      # Option 1 — change this string to whatever name you want
-            "Option 2",
-            "Option 3",
+            "Fuzz Dirs",      # Option 1 — change this string to whatever name you want
+            "Fuzz extensions",
+            "Query Fuzz",
             "Option 4",
             "Option 5",
             "Option 6",
@@ -671,30 +764,36 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_layout.addWidget(back_btn)
 
     def on_option_click(self, tool_name, option_index):
-        """
-        If Fuzzer + Option 1 -> build ffuf command using setup values
-        and insert it into the CLI (does NOT execute).
-        For other options/tools, insert a template command into the prompt.
-        """
         if tool_name.lower() == "fuzzer" and option_index == 1:
             domain = self.domain.strip().rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
-            # build the ffuf command (escaped/quoted)
             cmd = f'ffuf -u "{url}" -w "{wordlist}" -t 50 -o "{output_path}" -of json'
-
-            # insert command into terminal input line (does not auto-run)
+            self.replace_current_line(cmd)
+        elif option_index == 2:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            extensions = ".php,.bak,.old"
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f'ffuf -u "{url}" -w "{wordlist}" -e {extensions} -t 40 -o "{output_path}" -mc 200-500'
+            self.replace_current_line(cmd)
+        elif option_index == 3:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/search.php?FUZZ=1"
+            params_file = "params.txt"
+            output_path = os.path.join(self.output_dir, "params.json")
+            cmd = f"ffuf -u '{url}' -w {params_file} -t 40 -mc 200-500 -o {output_path} -of json"
             self.replace_current_line(cmd)
         else:
-            # default: prepare a template command and insert it
             if tool_name.lower() == "httpx":
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
             else:
                 cmd = f'# {tool_name} option {option_index} (configure command)'
             self.replace_current_line(cmd)
-    
-            
+
+
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
@@ -785,11 +884,7 @@ class CommandWorker(QThread):
                     except Exception:
                         pass
         except Exception:
-            # بی‌صدا عبور کن
             pass
-
-
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
