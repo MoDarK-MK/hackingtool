@@ -720,7 +720,7 @@ class ModernDarkTerminalApp(QMainWindow):
             "Fuzz Dirs",      # Option 1 — change this string to whatever name you want
             "Fuzz extensions",
             "Query Fuzz",
-            "Option 4",
+            "Subdomain Fuzz",
             "Option 5",
             "Option 6",
             "Option 7",
@@ -783,9 +783,17 @@ class ModernDarkTerminalApp(QMainWindow):
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/search.php?FUZZ=1"
             params_file = "params.txt"
-            output_path = os.path.join(self.output_dir, "params.json")
-            cmd = f"ffuf -u '{url}' -w {params_file} -t 40 -mc 200-500 -o {output_path} -of json"
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u '{url}' -w {params_file} -t 40 -mc 200-500 -o {output_path} "
             self.replace_current_line(cmd)
+        elif option_index == 4:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/"
+            subdomains_file = "subdomains.txt"
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u {url} -H 'Host: FUZZ.{domain}' -w {subdomains_file} -t 80 -mc 200 -o {output_path}"
+            self.replace_current_line(cmd)
+ 
         else:
             if tool_name.lower() == "httpx":
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
