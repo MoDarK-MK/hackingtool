@@ -1,4 +1,6 @@
 import sys
+import signal
+import platform
 import os
 import html
 import subprocess
@@ -423,44 +425,78 @@ class ModernDarkTerminalApp(QMainWindow):
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
 
     def eventFilter(self, source, event):
-        """
-        Handle Enter key to capture the command and run worker; handle Ctrl+L to clear.
-        This avoids double-handling and ensures we read only the typed part.
-        """
         if source == self.terminal and event.type() == event.Type.KeyPress:
             key = event.key()
             mods = event.modifiers()
+            
+            # Enter: اجرا فرمان
             if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
-                # grab last block (user input)
                 cursor = self.terminal.textCursor()
                 cursor.movePosition(QTextCursor.MoveOperation.End)
                 cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
                 block_text = cursor.selectedText()
-                # assume the command is text after the last '$'
                 if '$' in block_text:
                     command = block_text.split('$')[-1].strip()
                 else:
                     command = block_text.strip()
                 if command:
-                    # append newline so output appears on new line below prompt
-                    self.terminal.append("")  # move to new block
-                    # store history
+                    self.terminal.append("")
                     self.history.append(command)
                     self.history_index = len(self.history)
-                    # Start worker thread
                     self.current_worker = CommandWorker(command, cwd=self.output_dir)
                     self.current_worker.output_signal.connect(self.handle_output)
-                    # when finished, show prompt (use finished_signal to be consistent)
                     self.current_worker.finished_signal.connect(self.show_prompt)
                     self.current_worker.start()
                 return True
-
+            
+            # Ctrl+L: پاک کردن ترمینال
             if key == Qt.Key.Key_L and mods == Qt.KeyboardModifier.ControlModifier:
                 self.terminal.clear()
                 self.show_prompt()
                 return True
+            
+            # Ctrl+C: copy یا interrupt پروسه جاری
+            if key == Qt.Key.Key_C and mods == Qt.KeyboardModifier.ControlModifier:
+                cursor = self.terminal.textCursor()
+                has_selection = cursor.hasSelection()
+                if has_selection:
+                    self.terminal.copy()
+                else:
+                    worker = getattr(self, "current_worker", None)
+                    if worker is not None and isinstance(worker, QThread):
+                        try:
+                            if hasattr(worker, "interrupt"):
+                                worker.interrupt()
+                        except Exception:
+                            pass
+                    else:
+                        self.terminal.copy()
+                return True
+            
+            # Ctrl+V: paste
+            if key == Qt.Key.Key_V and mods == Qt.KeyboardModifier.ControlModifier:
+                self.terminal.paste()
+                return True
+            
+            # Arrow Up: فرمان قبلی
+            if key == Qt.Key.Key_Up:
+                if self.history and self.history_index > 0:
+                    self.history_index -= 1
+                    self.replace_current_line(self.history[self.history_index])
+                return True
+            
+            # Arrow Down: فرمان بعدی یا خط خالی
+            if key == Qt.Key.Key_Down:
+                if self.history and self.history_index < len(self.history) - 1:
+                    self.history_index += 1
+                    self.replace_current_line(self.history[self.history_index])
+                elif self.history_index == len(self.history) - 1:
+                    self.history_index += 1
+                    self.replace_current_line('')
+                return True
+
         return False
-    
+
     def ansi_to_html(self, text: str) -> str:
         ANSI_SGR_COLORS = {
             30: "black", 31: "red", 32: "green", 33: "orange", 34: "blue",
@@ -621,6 +657,7 @@ class ModernDarkTerminalApp(QMainWindow):
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
+        
 class CommandWorker(QThread):
     output_signal = pyqtSignal(str)
     finished_signal = pyqtSignal()
@@ -629,27 +666,87 @@ class CommandWorker(QThread):
         super().__init__()
         self.command = command
         self.cwd = cwd
+        self.process = None
 
     def run(self):
         try:
-            process = subprocess.Popen(
-                self.command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                cwd=self.cwd
-            )
-            for line in iter(process.stdout.readline, ''):
+            # اجرا در یک process group جدید تا بتونیم سیگنال به گروه ارسال کنیم
+            is_windows = platform.system() == "Windows"
+            if is_windows:
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+                self.process = subprocess.Popen(
+                    self.command,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=self.cwd,
+                    creationflags=creationflags
+                )
+            else:
+                # preexec_fn=os.setsid باعث میشه پروسه فرزند ریشه‌ی یک گروه جدید باشه
+                self.process = subprocess.Popen(
+                    self.command,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=self.cwd,
+                    preexec_fn=os.setsid
+                )
+
+            # خواندن خروجی خط به خط
+            for line in iter(self.process.stdout.readline, ''):
                 if line is None:
                     break
+                # ارسال هر خط به UI
                 self.output_signal.emit(line.rstrip('\n'))
-            process.stdout.close()
-            process.wait()
+            if self.process.stdout:
+                self.process.stdout.close()
+            self.process.wait()
         except Exception as e:
             self.output_signal.emit(f"[Error] {str(e)}")
         finally:
             self.finished_signal.emit()
+            # پس از اتمام، null کردن مرجع پروسه
+            try:
+                self.process = None
+            except Exception:
+                pass
+
+    def interrupt(self):
+        """
+        سعی می‌کنیم SIGINT یا معادلش رو به پروسه/گروه پروسه بفرستیم.
+        اگر نشد، fallback به terminate.
+        """
+        if not self.process:
+            return
+
+        try:
+            is_windows = platform.system() == "Windows"
+            if is_windows:
+                # ارسال CTRL_BREAK_EVENT به گروه پروسه (نیاز به CREATE_NEW_PROCESS_GROUP)
+                try:
+                    self.process.send_signal(signal.CTRL_BREAK_EVENT)
+                except Exception:
+                    # fallback: terminate
+                    try:
+                        self.process.terminate()
+                    except Exception:
+                        pass
+            else:
+                # POSIX: سیگنال به whole process group
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
+                except Exception:
+                    try:
+                        self.process.terminate()
+                    except Exception:
+                        pass
+        except Exception:
+            # بی‌صدا عبور کن
+            pass
+
 
 
 
