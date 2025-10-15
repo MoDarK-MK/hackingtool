@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import re
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QFrame, QPlainTextEdit, QLabel, QScrollArea,
@@ -8,6 +9,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
 from PyQt6.QtGui import QTextCursor, QGuiApplication
+from PyQt6.QtCore import QThread, pyqtSignal
+
 
 class InitialSetupDialog(QDialog):
     def __init__(self, parent=None):
@@ -325,13 +328,25 @@ class ModernDarkTerminalApp(QMainWindow):
 
     def eventFilter(self, source, event):
         if source == self.terminal and event.type() == event.Type.KeyPress:
-            if event.key() == Qt.Key.Key_C and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                if self.process:
-                    self.process.terminate()
-                    self.terminal.appendPlainText("^C")
-                    self.show_prompt()
-                    self.process = None
+            if event.key() == Qt.Key.Key_Return:
+                cursor = self.terminal.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                last_line = self.terminal.document().toPlainText().split('\n')[-1]
+                command = last_line.split('$')[-1].strip()
+                if command:
+                    self.history.append(command)
+                    self.history_index = len(self.history)
+                    self.terminal.appendPlainText("")  # blank line before output
+
+                    # start worker to run command safely (non-blocking) and stream output
+                    self.current_worker = CommandWorker(command, cwd=self.output_dir)
+                    # append each emitted line to terminal in main thread
+                    self.current_worker.output_signal.connect(lambda text: self.terminal.appendPlainText(text))
+                    # when finished, show prompt again
+                    self.current_worker.finished_signal.connect(self.show_prompt)
+                    self.current_worker.start()
                 return True
+
             if event.key() == Qt.Key.Key_L and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
                 self.terminal.clear()
                 self.show_prompt()
@@ -344,36 +359,16 @@ class ModernDarkTerminalApp(QMainWindow):
                 if command:
                     self.history.append(command)
                     self.history_index = len(self.history)
-                    try:
-                        self.process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=self.output_dir)
-                        stdout, stderr = self.process.communicate()
-                        output = stdout + stderr
-                    except Exception as e:
-                        output = str(e)
-                    try:
-                        outpath = os.path.join(self.output_dir, self.output_filename)
-                        with open(outpath, "a", encoding="utf-8") as f:
-                            f.write(f"$ {command}\n")
-                            f.write(output + "\n")
-                    except Exception:
-                        pass
-                    self.terminal.appendPlainText(output)
-                self.show_prompt()
-                self.process = None
+                    self.terminal.appendPlainText("")  # new line before output
+
+                    # Run command in QThread (safe, async)
+                    self.worker = CommandWorker(command, self.output_dir)
+                    self.worker.output_signal.connect(lambda text: self.terminal.appendPlainText(text))
+                    self.worker.finished.connect(self.show_prompt)
+                    self.worker.start()
                 return True
-            if event.key() == Qt.Key.Key_Up:
-                if self.history:
-                    self.history_index = max(0, self.history_index - 1)
-                    self.replace_current_line(self.history[self.history_index])
-                return True
-            if event.key() == Qt.Key.Key_Down:
-                if self.history_index < len(self.history) - 1:
-                    self.history_index += 1
-                    self.replace_current_line(self.history[self.history_index])
-                else:
-                    self.replace_current_line("")
-                return True
-        return super().eventFilter(source, event)
+        return False
+
 
     def replace_current_line(self, text):
         cursor = self.terminal.textCursor()
@@ -389,8 +384,21 @@ class ModernDarkTerminalApp(QMainWindow):
             widget = self.scroll_layout.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
-        for i in range(1, 11):
-            btn = QPushButton(f"Option {i}")
+        option_labels = [
+            "FFUF Dirs",      # Option 1 — change this string to whatever name you want
+            "Option 2",
+            "Option 3",
+            "Option 4",
+            "Option 5",
+            "Option 6",
+            "Option 7",
+            "Option 8",
+            "Option 9",
+            "Option 10"
+        ]
+
+        for idx, label in enumerate(option_labels, start=1):
+            btn = QPushButton(label)
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
@@ -404,9 +412,10 @@ class ModernDarkTerminalApp(QMainWindow):
                     background-color: #7B61FF;
                 }
             """)
-            btn.clicked.connect(lambda checked, idx=i, t=tool_name: self.on_option_click(t, idx))
+            # keep original binding: pass the option index and tool name to handler
+            btn.clicked.connect(lambda checked, i=idx, t=tool_name: self.on_option_click(t, i))
             self.scroll_layout.addWidget(btn)
-        back_btn = QPushButton("Back")
+            back_btn = QPushButton("Back")
         back_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF5555;
@@ -450,6 +459,36 @@ class ModernDarkTerminalApp(QMainWindow):
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
+class CommandWorker(QThread):
+    output_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal()
+
+    def __init__(self, command, cwd=None):
+        super().__init__()
+        self.command = command
+        self.cwd = cwd
+
+    def run(self):
+        try:
+            process = subprocess.Popen(
+                self.command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=self.cwd
+            )
+            for line in iter(process.stdout.readline, ''):
+                if line is None:
+                    break
+                self.output_signal.emit(line.rstrip('\n'))
+            process.stdout.close()
+            process.wait()
+        except Exception as e:
+            self.output_signal.emit(f"[Error] {str(e)}")
+        finally:
+            self.finished_signal.emit()
+
 
 
 if __name__ == "__main__":
