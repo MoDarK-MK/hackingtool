@@ -720,9 +720,9 @@ class ModernDarkTerminalApp(QMainWindow):
             "Fuzz Dirs",      # Option 1 — change this string to whatever name you want
             "Fuzz extensions",
             "Query Fuzz",
-            "Subdomain Fuzz",
-            "Option 5",
-            "Option 6",
+            "subdomain Fuzz",
+            "Packet Fuzz",
+            "Depth Fuzz",
             "Option 7",
             "Option 8",
             "Option 9",
@@ -777,23 +777,38 @@ class ModernDarkTerminalApp(QMainWindow):
             wordlist = self.wordlist_path
             extensions = ".php,.bak,.old"
             output_path = os.path.join(self.output_dir, self.output_filename)
-            cmd = f'ffuf -u "{url}" -w "{wordlist}" -e {extensions} -t 40 -o "{output_path}" -mc 200-500'
+            cmd = f'ffuf -u "{url}" -w "{wordlist}" -e {extensions} -t 40 -o "{output_path}" -mc 200-500 -of json'
             self.replace_current_line(cmd)
         elif option_index == 3:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/search.php?FUZZ=1"
-            params_file = "params.txt"
+            wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
-            cmd = f"ffuf -u '{url}' -w {params_file} -t 40 -mc 200-500 -o {output_path} "
+            cmd = f"ffuf -u '{url}' -w {wordlist} -t 40 -mc 200-500 -o {output_path} -of json"
             self.replace_current_line(cmd)
         elif option_index == 4:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/"
-            subdomains_file = "subdomains.txt"
+            wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
-            cmd = f"ffuf -u {url} -H 'Host: FUZZ.{domain}' -w {subdomains_file} -t 80 -mc 200 -o {output_path}"
+            cmd = f"ffuf -u {url} -H 'Host: FUZZ.{domain}' -w {wordlist} -t 80 -mc 200 -o {output_path} -of json"
             self.replace_current_line(cmd)
- 
+        elif option_index == 5:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/login"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u {url} -d 'username=admin&password=FUZZ' -X POST -w {wordlist} -H 'Content-Type: application/x-www-form-urlencoded' -t 30 -mc 200,302 -o {output_path} -of json"
+            self.replace_current_line(cmd)
+        elif option_index == 6:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            extensions = ".php,.html"
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u '{url}' -w '{wordlist}' -recursion -recursion-depth 2 -t 50 -e '{extensions}' -o '{output_path}' -of json"
+            self.replace_current_line(cmd)
+
         else:
             if tool_name.lower() == "httpx":
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
