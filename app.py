@@ -717,13 +717,13 @@ class ModernDarkTerminalApp(QMainWindow):
             if widget:
                 widget.setParent(None)
         option_labels = [
-            "Fuzz Dirs",      # Option 1 — change this string to whatever name you want
+            "Fuzz Dirs",
             "Fuzz extensions",
             "Query Fuzz",
             "subdomain Fuzz",
             "Packet Fuzz",
             "Depth Fuzz",
-            "Option 7",
+            "Human Fuzz",
             "Option 8",
             "Option 9",
             "Option 10"
@@ -744,7 +744,7 @@ class ModernDarkTerminalApp(QMainWindow):
                     background-color: #7B61FF;
                 }
             """)
-            # keep original binding: pass the option index and tool name to handler
+            
             btn.clicked.connect(lambda checked, i=idx, t=tool_name: self.on_option_click(t, i))
             self.scroll_layout.addWidget(btn)
             back_btn = QPushButton("Back")
@@ -760,6 +760,7 @@ class ModernDarkTerminalApp(QMainWindow):
                 background-color: #FF7777;
             }
         """)
+        
         back_btn.clicked.connect(self.back_to_main)
         self.scroll_layout.addWidget(back_btn)
 
@@ -808,6 +809,14 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -recursion -recursion-depth 2 -t 50 -e '{extensions}' -o '{output_path}' -of json"
             self.replace_current_line(cmd)
+        elif option_index == 7:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u '{url}' -w '{wordlist}' -t 30 -rate 50 -timeout 10 -o '{output_path}' -of json"
+            self.replace_current_line(cmd)
+
 
         else:
             if tool_name.lower() == "httpx":
@@ -833,7 +842,6 @@ class CommandWorker(QThread):
 
     def run(self):
         try:
-            # اجرا در یک process group جدید تا بتونیم سیگنال به گروه ارسال کنیم
             is_windows = platform.system() == "Windows"
             if is_windows:
                 creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -847,7 +855,6 @@ class CommandWorker(QThread):
                     creationflags=creationflags
                 )
             else:
-                # preexec_fn=os.setsid باعث میشه پروسه فرزند ریشه‌ی یک گروه جدید باشه
                 self.process = subprocess.Popen(
                     self.command,
                     shell=True,
