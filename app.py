@@ -267,6 +267,50 @@ class ModernDarkTerminalApp(QMainWindow):
         self.terminal.setReadOnly(False)
         self.terminal.installEventFilter(self)
         self.main_layout_content.addWidget(self.terminal)
+        # --- Quick button bar under terminal ---
+        self.button_bar_frame = QFrame()
+        self.button_bar_frame.setFixedHeight(56)
+        self.button_bar_frame.setStyleSheet("background-color: #1B1B2B;")  # تیرهِ ملایم
+        button_bar_layout = QHBoxLayout()
+        button_bar_layout.setContentsMargins(10, 8, 10, 8)
+        button_bar_layout.setSpacing(8)
+        self.button_bar_frame.setLayout(button_bar_layout)
+
+        # Buttons: Clear, Copy, Change Wordlist, Back to Menu
+        btn_clear = QPushButton("Clear")
+        btn_copy = QPushButton("Copy")
+        btn_change_wordlist = QPushButton("Change Wordlist")
+        btn_back_menu = QPushButton("Back")
+
+        for b in (btn_clear, btn_copy, btn_change_wordlist, btn_back_menu):
+            b.setFixedHeight(40)
+            b.setStyleSheet("""
+                QPushButton {
+                    background-color: #7B61FF;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    padding: 6px 12px;
+                }
+                QPushButton:hover {
+                    background-color: #9E7CFF;
+                }
+            """)
+            button_bar_layout.addWidget(b)
+
+        # spacing to push buttons left if desired (optional)
+        button_bar_layout.addStretch()
+
+        # connect signals
+        btn_clear.clicked.connect(lambda: (self.terminal.clear(), self.show_prompt()))
+        btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(self.terminal.toPlainText()))
+        btn_back_menu.clicked.connect(self.back_to_main)
+        btn_change_wordlist.clicked.connect(self.change_wordlist)
+
+        # add the frame under the terminal in the same content area
+        self.main_layout_content.addWidget(self.button_bar_frame)
+
         self.container_layout.addWidget(self.main_content)
 
         # Put together
@@ -286,6 +330,24 @@ class ModernDarkTerminalApp(QMainWindow):
         self.username = os.getlogin() if hasattr(os, "getlogin") else "user"
         self.cwd = os.getcwd()
         self.show_prompt()
+        
+    def change_wordlist(self):
+        """
+        Let the user pick a new wordlist file and update self.wordlist_path.
+        Shows a confirmation message on success.
+        """
+        path, _ = QFileDialog.getOpenFileName(self, "Select new wordlist file",
+                                            "", "Text Files (*.txt);;All Files (*)")
+        if not path:
+            return
+        if not os.path.isfile(path):
+            QMessageBox.warning(self, "Invalid File", "Selected file does not exist.")
+            return
+        self.wordlist_path = path
+        self.terminal.append("")
+        self.terminal.insertPlainText(f"[info] wordlist updated: {self.wordlist_path}\n")
+        QMessageBox.information(self, "Wordlist Updated", f"New wordlist set to:\n{self.wordlist_path}")
+
 
     def add_main_buttons(self):
         for i in reversed(range(self.scroll_layout.count())):
@@ -866,60 +928,57 @@ class ModernDarkTerminalApp(QMainWindow):
             output_base = f"https://{domain}"
             
             if option_index == 1:
-                # Basic probe for the domain
                 out = os.path.join(self.output_dir, f"httpx_basic_{domain}.txt")
                 cmd = f'httpx -u {output_base} -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 2:
-                # List from file (use wordlist_path as endpoints file by default)
                 out = os.path.join(self.output_dir, f"httpx_list_{domain}.txt")
                 cmd = f'httpx -l "{self.wordlist_path}" -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 3:
-                # Title extract
                 out = os.path.join(self.output_dir, f"httpx_title_{domain}.txt")
                 cmd = f'httpx -u {output_base} -title -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 4:
-                # Status codes summary
                 out = os.path.join(self.output_dir, f"httpx_status_{domain}.txt")
                 cmd = f'httpx -u {output_base} -status-code -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 5:
-                # Grab headers
                 out = os.path.join(self.output_dir, f"httpx_headers_{domain}.txt")
                 cmd = f'httpx -u {output_base} -headers -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 6:
-                # Probe with different HTTP methods (GET,POST,PUT)
                 out = os.path.join(self.output_dir, f"httpx_methods_{domain}.txt")
                 cmd = f'httpx -l "{self.wordlist_path}" -methods GET,POST -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 7:
-                # Follow redirects
                 out = os.path.join(self.output_dir, f"httpx_follow_{domain}.txt")
                 cmd = f'httpx -l "{self.wordlist_path}" -follow-redirects -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 8:
-                # Timeout and retries tuning
                 out = os.path.join(self.output_dir, f"httpx_timeout_{domain}.txt")
                 cmd = f'httpx -l "{self.wordlist_path}" -timeout 10 -retries 2 -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 9:
-                # Concurrency / rate control
                 out = os.path.join(self.output_dir, f"httpx_conc_{domain}.txt")
                 cmd = f'httpx -l "{self.wordlist_path}" -c 50 -o "{out}"'
                 self.replace_current_line(cmd)
+                
             elif option_index == 10:
-                # Custom template: insert a placeholder command the user can edit
                 out = os.path.join(self.output_dir, f"httpx_custom_{domain}.txt")
-                cmd = f'# Custom httpx: httpx -u https://{domain}/path -o "{out}"'
+                cmd = f'httpx -u https://{domain}/path -o "{out}"'
                 self.replace_current_line(cmd)
 
-        # ------- Fallback: other tools or default templates -------
         else:
             if tool_name.lower() == "httpx":
-                # (redundant fallback, but keep safety)
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
             else:
                 cmd = f'# {tool_name} option {option_index} (configure command)'
