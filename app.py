@@ -823,7 +823,13 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -fs 0 -fw 5 'f'-mr 'index of|Directory listing' -o '{output_path}' -of json"
             self.replace_current_line(cmd)
-
+        elif option_index == 9:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u 'https://{domain}/FUZZ' -H 'X-Api-Token: FUZZ2' -w '{wordlist}':FUZZ -w '{wordlist}':FUZZ2 -t 60 -mc 200 -o '{output_path}' -of json"
+            self.replace_current_line(cmd)
 
 
         else:
