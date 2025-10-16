@@ -716,18 +716,35 @@ class ModernDarkTerminalApp(QMainWindow):
             widget = self.scroll_layout.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
-        option_labels = [
-            "Fuzz Dirs",
-            "Fuzz extensions",
-            "Query Fuzz",
-            "subdomain Fuzz",
-            "Packet Fuzz",
-            "Depth Fuzz",
-            "Human Fuzz",
-            "Regex Fuzz",
-            "Multi Fuzz",
-            "Suggested Command"
-        ]
+
+        # If the user opened HTTPX, show a specialized list of 10 httpx options
+        if tool_name.lower() == "httpx":
+            option_labels = [
+                "Basic Probe",           # Option 1
+                "List from File",        # Option 2
+                "Title Extract",         # Option 3
+                "Status Codes",          # Option 4
+                "Headers Grab",          # Option 5
+                "HTTP Methods",          # Option 6
+                "Follow Redirects",      # Option 7
+                "Timeout & Retries",     # Option 8
+                "Concurrency Scan",      # Option 9
+                "Custom Template"        # Option 10
+            ]
+        else:
+            # default labels for other tools (Fuzzer etc.)
+            option_labels = [
+                "Fuzz Dirs",
+                "Fuzz extensions",
+                "Query Fuzz",
+                "subdomain Fuzz",
+                "Packet Fuzz",
+                "Depth Fuzz",
+                "Human Fuzz",
+                "Regex Fuzz",
+                "Multi Fuzz",
+                "Suggested Command"
+            ]
 
         for idx, label in enumerate(option_labels, start=1):
             btn = QPushButton(label)
@@ -744,10 +761,10 @@ class ModernDarkTerminalApp(QMainWindow):
                     background-color: #7B61FF;
                 }
             """)
-            
             btn.clicked.connect(lambda checked, i=idx, t=tool_name: self.on_option_click(t, i))
             self.scroll_layout.addWidget(btn)
-            back_btn = QPushButton("Back")
+
+        back_btn = QPushButton("Back")
         back_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF5555;
@@ -760,9 +777,9 @@ class ModernDarkTerminalApp(QMainWindow):
                 background-color: #FF7777;
             }
         """)
-        
         back_btn.clicked.connect(self.back_to_main)
         self.scroll_layout.addWidget(back_btn)
+
 
     def on_option_click(self, tool_name, option_index):
         if tool_name.lower() == "fuzzer" and option_index == 1:
@@ -772,8 +789,8 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f'ffuf -u "{url}" -w "{wordlist}" -t 50 -o "{output_path}" -of json'
             self.replace_current_line(cmd)
-            
-        elif option_index == 2:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 2:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
@@ -781,32 +798,32 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f'ffuf -u "{url}" -w "{wordlist}" -e {extensions} -t 40 -o "{output_path}" -mc 200-500 -of json'
             self.replace_current_line(cmd)
-            
-        elif option_index == 3:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 3:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/search.php?FUZZ=1"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w {wordlist} -t 40 -mc 200-500 -o {output_path} -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 4:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 4:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u {url} -H 'Host: FUZZ.{domain}' -w {wordlist} -t 80 -mc 200 -o {output_path} -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 5:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 5:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/login"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u {url} -d 'username=admin&password=FUZZ' -X POST -w {wordlist} -H 'Content-Type: application/x-www-form-urlencoded' -t 30 -mc 200,302 -o {output_path} -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 6:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 6:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
@@ -814,47 +831,99 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -recursion -recursion-depth 2 -t 50 -e '{extensions}' -o '{output_path}' -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 7:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 7:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -t 30 -rate 50 -timeout 10 -o '{output_path}' -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 8:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 8:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
-            cmd = f"ffuf -u '{url}' -w '{wordlist}' -fs 0 -fw 5 'f'-mr 'index of|Directory listing' -o '{output_path}' -of json"
+            cmd = f'ffuf -u "{url}" -w "{wordlist}" -fs 0 -fw 5 -mr "index of|Directory listing" -o "{output_path}" -of json'
             self.replace_current_line(cmd)
-            
-        elif option_index == 9:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 9:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
-            url = f"https://{domain}/FUZZ"
-            wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
-            cmd = f"ffuf -u 'https://{domain}/FUZZ' -H 'X-Api-Token: FUZZ2' -w '{wordlist}':FUZZ -w '{wordlist}':FUZZ2 -t 60 -mc 200 -o '{output_path}' -of json"
+            cmd = f"ffuf -u 'https://{domain}/FUZZ' -H 'X-Api-Token: FUZZ2' -w '{self.wordlist_path}':FUZZ -w '{self.wordlist_path}':FUZZ2 -t 60 -mc 200 -o '{output_path}' -of json"
             self.replace_current_line(cmd)
-            
-        elif option_index == 10:
+
+        elif tool_name.lower() == "fuzzer" and option_index == 10:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
-            url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -c -w {wordlist}  -u http://{domain}/FUZZ -of json"
             self.replace_current_line(cmd)
 
+        elif tool_name.lower() == "httpx":
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            output_base = f"https://{domain}"
+            
+            if option_index == 1:
+                # Basic probe for the domain
+                out = os.path.join(self.output_dir, f"httpx_basic_{domain}.txt")
+                cmd = f'httpx -u {output_base} -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 2:
+                # List from file (use wordlist_path as endpoints file by default)
+                out = os.path.join(self.output_dir, f"httpx_list_{domain}.txt")
+                cmd = f'httpx -l "{self.wordlist_path}" -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 3:
+                # Title extract
+                out = os.path.join(self.output_dir, f"httpx_title_{domain}.txt")
+                cmd = f'httpx -u {output_base} -title -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 4:
+                # Status codes summary
+                out = os.path.join(self.output_dir, f"httpx_status_{domain}.txt")
+                cmd = f'httpx -u {output_base} -status-code -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 5:
+                # Grab headers
+                out = os.path.join(self.output_dir, f"httpx_headers_{domain}.txt")
+                cmd = f'httpx -u {output_base} -headers -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 6:
+                # Probe with different HTTP methods (GET,POST,PUT)
+                out = os.path.join(self.output_dir, f"httpx_methods_{domain}.txt")
+                cmd = f'httpx -l "{self.wordlist_path}" -methods GET,POST -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 7:
+                # Follow redirects
+                out = os.path.join(self.output_dir, f"httpx_follow_{domain}.txt")
+                cmd = f'httpx -l "{self.wordlist_path}" -follow-redirects -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 8:
+                # Timeout and retries tuning
+                out = os.path.join(self.output_dir, f"httpx_timeout_{domain}.txt")
+                cmd = f'httpx -l "{self.wordlist_path}" -timeout 10 -retries 2 -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 9:
+                # Concurrency / rate control
+                out = os.path.join(self.output_dir, f"httpx_conc_{domain}.txt")
+                cmd = f'httpx -l "{self.wordlist_path}" -c 50 -o "{out}"'
+                self.replace_current_line(cmd)
+            elif option_index == 10:
+                # Custom template: insert a placeholder command the user can edit
+                out = os.path.join(self.output_dir, f"httpx_custom_{domain}.txt")
+                cmd = f'# Custom httpx: httpx -u https://{domain}/path -o "{out}"'
+                self.replace_current_line(cmd)
 
+        # ------- Fallback: other tools or default templates -------
         else:
             if tool_name.lower() == "httpx":
+                # (redundant fallback, but keep safety)
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
             else:
                 cmd = f'# {tool_name} option {option_index} (configure command)'
             self.replace_current_line(cmd)
-
 
     def back_to_main(self):
         self.header_label.setText("")
