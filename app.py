@@ -724,7 +724,7 @@ class ModernDarkTerminalApp(QMainWindow):
             "Packet Fuzz",
             "Depth Fuzz",
             "Human Fuzz",
-            "Option 8",
+            "Regex Fuzz",
             "Option 9",
             "Option 10"
         ]
@@ -816,6 +816,14 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -t 30 -rate 50 -timeout 10 -o '{output_path}' -of json"
             self.replace_current_line(cmd)
+        elif option_index == 8:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -u '{url}' -w '{wordlist}' -fs 0 -fw 5 'f'-mr 'index of|Directory listing' -o '{output_path}' -of json"
+            self.replace_current_line(cmd)
+
 
 
         else:
