@@ -779,22 +779,34 @@ class ModernDarkTerminalApp(QMainWindow):
             if widget:
                 widget.setParent(None)
 
-        # If the user opened HTTPX, show a specialized list of 10 httpx options
-        if tool_name.lower() == "httpx":
+        t = tool_name.lower()
+        if t == "httpx":
             option_labels = [
-                "Basic Probe",           # Option 1
-                "List from File",        # Option 2
-                "Title Extract",         # Option 3
-                "Status Codes",          # Option 4
-                "Headers Grab",          # Option 5
-                "HTTP Methods",          # Option 6
-                "Follow Redirects",      # Option 7
-                "Timeout & Retries",     # Option 8
-                "Concurrency Scan",      # Option 9
-                "Custom Template"        # Option 10
+                "Basic Probe",
+                "List from File",
+                "Title Extract",
+                "Status Codes",
+                "Headers Grab",
+                "HTTP Methods",
+                "Follow Redirects",
+                "Timeout & Retries",
+                "Concurrency Scan",
+                "Custom Template"
+            ]
+        elif t == "subfinder":
+            option_labels = [
+                "Passive Scan",         # 1
+                "Recursive Scan",       # 2
+                "Brute (wordlist)",     # 3
+                "Use Custom Resolvers", # 4
+                "Timeout Tuning",       # 5
+                "Threads (concurrency)",# 6
+                "All Sources",          # 7
+                "Cert-based Scan",      # 8
+                "Save JSON",            # 9
+                "Custom Template"       #10
             ]
         else:
-            # default labels for other tools (Fuzzer etc.)
             option_labels = [
                 "Fuzz Dirs",
                 "Fuzz extensions",
@@ -841,6 +853,7 @@ class ModernDarkTerminalApp(QMainWindow):
         """)
         back_btn.clicked.connect(self.back_to_main)
         self.scroll_layout.addWidget(back_btn)
+
 
 
     def on_option_click(self, tool_name, option_index):
@@ -922,6 +935,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -c -w {wordlist}  -u http://{domain}/FUZZ -of json"
             self.replace_current_line(cmd)
+        
 
         elif tool_name.lower() == "httpx":
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
@@ -976,14 +990,72 @@ class ModernDarkTerminalApp(QMainWindow):
                 out = os.path.join(self.output_dir, f"httpx_custom_{domain}.txt")
                 cmd = f'httpx -u https://{domain}/path -o "{out}"'
                 self.replace_current_line(cmd)
+                
+        #------- Subfinder-specific options (NEW) -------
+         
+        elif tool_name.lower() == "subfinder":
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            # common output filenames inside output_dir
+            if option_index == 1:
+                # Passive scan (default sources)
+                out = os.path.join(self.output_dir, f"subfinder_passive_{domain}.txt")
+                cmd = f"subfinder -d {domain} -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 2:
+                # Recursive enumeration
+                out = os.path.join(self.output_dir, f"subfinder_recursive_{domain}.txt")
+                cmd = f"subfinder -d {domain} -recursive -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 3:
+                # Brute force using a wordlist (uses self.wordlist_path)
+                out = os.path.join(self.output_dir, f"subfinder_brute_{domain}.txt")
+                cmd = f"subfinder -d {domain} -brute -w \"{self.wordlist_path}\" -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 4:
+                # Use custom resolvers file (resolvers.txt expected)
+                resolvers = "resolvers.txt"
+                out = os.path.join(self.output_dir, f"subfinder_resolvers_{domain}.txt")
+                cmd = f"subfinder -d {domain} -o \"{out}\" -r \"{resolvers}\""
+                self.replace_current_line(cmd)
+            elif option_index == 5:
+                # Timeout tuning
+                out = os.path.join(self.output_dir, f"subfinder_timeout_{domain}.txt")
+                cmd = f"subfinder -d {domain} -timeout 10 -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 6:
+                # Threads / concurrency
+                out = os.path.join(self.output_dir, f"subfinder_threads_{domain}.txt")
+                cmd = f"subfinder -d {domain} -t 50 -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 7:
+                # Use all sources (exhaustive)
+                out = os.path.join(self.output_dir, f"subfinder_all_{domain}.txt")
+                cmd = f"subfinder -d {domain} -all -o \"{out}\""
+                self.replace_current_line(cmd)
+            elif option_index == 8:
+                # Certificate transparency based scan
+                out = os.path.join(self.output_dir, f"subfinder_cert_{domain}.txt")
+                cmd = f"subfinder -d {domain} -o \"{out}\" -crt"
+                self.replace_current_line(cmd)
+            elif option_index == 9:
+                # Save JSON output
+                out = os.path.join(self.output_dir, f"subfinder_{domain}.json")
+                cmd = f"subfinder -d {domain} -o \"{out}\" -oJ"
+                self.replace_current_line(cmd)
+            elif option_index == 10:
+                # Custom template for user editing
+                out = os.path.join(self.output_dir, f"subfinder_custom_{domain}.txt")
+                cmd = f"# Custom: subfinder -d {domain} -o \"{out}\""
+                self.replace_current_line(cmd)
 
+        # ------- Fallback: other tools or default templates -------
         else:
             if tool_name.lower() == "httpx":
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
             else:
                 cmd = f'# {tool_name} option {option_index} (configure command)'
             self.replace_current_line(cmd)
-
+ 
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
