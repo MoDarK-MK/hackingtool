@@ -31,13 +31,11 @@ class InitialSetupDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Domain
         self.domain_label = QLabel("Domain:")
         self.domain_input = QLineEdit()
         layout.addWidget(self.domain_label)
         layout.addWidget(self.domain_input)
 
-        # Wordlist (file) + browse
         self.wordlist_label = QLabel("Path to wordlist (file):")
         wordlist_h = QHBoxLayout()
         self.wordlist_input = QLineEdit()
@@ -48,7 +46,6 @@ class InitialSetupDialog(QDialog):
         layout.addWidget(self.wordlist_label)
         layout.addLayout(wordlist_h)
 
-        # Output directory + browse
         self.output_dir_label = QLabel("Output directory:")
         output_h = QHBoxLayout()
         self.output_dir_input = QLineEdit()
@@ -59,13 +56,11 @@ class InitialSetupDialog(QDialog):
         layout.addWidget(self.output_dir_label)
         layout.addLayout(output_h)
 
-        # Output filename
         self.output_name_label = QLabel("Output filename (e.g. results.txt):")
         self.output_name_input = QLineEdit()
         layout.addWidget(self.output_name_label)
         layout.addWidget(self.output_name_input)
 
-        # Buttons
         btn_h = QHBoxLayout()
         btn_h.addStretch()
         self.submit_btn = QPushButton("Submit")
@@ -76,7 +71,6 @@ class InitialSetupDialog(QDialog):
         btn_h.addWidget(self.submit_btn)
         layout.addLayout(btn_h)
 
-        # Result storage
         self.result = None
 
     def center(self, parent):
@@ -134,7 +128,6 @@ class ModernDarkTerminalApp(QMainWindow):
         self._last_was_output_line = False
         super().__init__()
 
-        # Show setup dialog first
         setup = InitialSetupDialog(self)
         if setup.exec() != QDialog.DialogCode.Accepted:
             sys.exit(0)
@@ -145,7 +138,6 @@ class ModernDarkTerminalApp(QMainWindow):
         self.output_dir = res["output_dir"]
         self.output_filename = res["output_name"]
 
-        # set cwd to output directory
         try:
             os.chdir(self.output_dir)
         except Exception:
@@ -160,7 +152,6 @@ class ModernDarkTerminalApp(QMainWindow):
         self.main_layout = QVBoxLayout()
         self.central_widget.setLayout(self.main_layout)
 
-        # Top bar: left domain, right window controls
         self.top_bar = QFrame()
         self.top_bar.setFixedHeight(40)
         self.top_bar.setStyleSheet("background-color: #1F1F2E;")
@@ -197,19 +188,16 @@ class ModernDarkTerminalApp(QMainWindow):
         top_layout.addWidget(self.btn_max)
         top_layout.addWidget(self.btn_close)
 
-        # Container (sidebar + terminal)
         self.container = QFrame()
         self.container_layout = QHBoxLayout()
         self.container.setLayout(self.container_layout)
 
-        # Sidebar
         self.sidebar = QFrame()
         self.sidebar.setStyleSheet("background-color: #1F1F2E;")
         self.sidebar.setFixedWidth(220)
         self.sidebar_layout = QVBoxLayout()
         self.sidebar.setLayout(self.sidebar_layout)
 
-        # Toggle button
         self.toggle_btn = QPushButton("☰")
         self.toggle_btn.setStyleSheet("""
             QPushButton {
@@ -228,12 +216,10 @@ class ModernDarkTerminalApp(QMainWindow):
         self.sidebar_layout.addWidget(self.toggle_btn)
         self.sidebar_layout.addSpacing(8)
 
-        # Header label
         self.header_label = QLabel("")
         self.header_label.setStyleSheet("color: white; font-weight: bold; padding: 5px;")
         self.sidebar_layout.addWidget(self.header_label)
 
-        # Scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_content = QWidget()
@@ -242,12 +228,10 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_area.setWidget(self.scroll_content)
         self.sidebar_layout.addWidget(self.scroll_area)
 
-        # Main menu buttons
         self.main_buttons = ["Fuzzer", "HTTPX", "Subfinder", "Nuclei", "DNSX"]
         self.add_main_buttons()
         self.container_layout.addWidget(self.sidebar)
 
-        # Terminal
         self.main_content = QFrame()
         self.main_content.setStyleSheet("background-color: #2E2E3E;")
         self.main_layout_content = QVBoxLayout()
@@ -267,16 +251,14 @@ class ModernDarkTerminalApp(QMainWindow):
         self.terminal.setReadOnly(False)
         self.terminal.installEventFilter(self)
         self.main_layout_content.addWidget(self.terminal)
-        # --- Quick button bar under terminal ---
         self.button_bar_frame = QFrame()
         self.button_bar_frame.setFixedHeight(56)
-        self.button_bar_frame.setStyleSheet("background-color: #1B1B2B;")  # تیرهِ ملایم
+        self.button_bar_frame.setStyleSheet("background-color: #1B1B2B;")
         button_bar_layout = QHBoxLayout()
         button_bar_layout.setContentsMargins(10, 8, 10, 8)
         button_bar_layout.setSpacing(8)
         self.button_bar_frame.setLayout(button_bar_layout)
 
-        # Buttons: Clear, Copy, Change Wordlist, Back to Menu
         btn_clear = QPushButton("Clear")
         btn_copy = QPushButton("Copy")
         btn_change_wordlist = QPushButton("Change Wordlist")
@@ -299,31 +281,25 @@ class ModernDarkTerminalApp(QMainWindow):
             """)
             button_bar_layout.addWidget(b)
 
-        # spacing to push buttons left if desired (optional)
         button_bar_layout.addStretch()
 
-        # connect signals
         btn_clear.clicked.connect(lambda: (self.terminal.clear(), self.show_prompt()))
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(self.terminal.toPlainText()))
         btn_back_menu.clicked.connect(self.back_to_main)
         btn_change_wordlist.clicked.connect(self.change_wordlist)
 
-        # add the frame under the terminal in the same content area
         self.main_layout_content.addWidget(self.button_bar_frame)
 
         self.container_layout.addWidget(self.main_content)
 
-        # Put together
         self.main_layout.addWidget(self.top_bar)
         self.main_layout.addWidget(self.container)
 
-        # Sidebar animation
         self.sidebar_animation = QPropertyAnimation(self.sidebar, b"maximumWidth")
         self.sidebar_animation.setDuration(250)
         self.sidebar_animation.setEasingCurve(QEasingCurve.Type.InOutQuart)
         self.sidebar_expanded = True
 
-        # Terminal data
         self.process = None
         self.history = []
         self.history_index = -1
@@ -397,9 +373,7 @@ class ModernDarkTerminalApp(QMainWindow):
         Handles sequences like \x1b[31m (red) and \x1b[0m (reset) and bold (1).
         Other sequences are removed.
         """
-        # escape html first
         text = html.escape(text)
-        # regex to find SGR params
         sgr_re = re.compile(r'\\x1B\\[([0-9;]*)m')
         parts = []
         last_pos = 0
@@ -408,12 +382,10 @@ class ModernDarkTerminalApp(QMainWindow):
         for m in sgr_re.finditer(text):
             start, end = m.span()
             params = m.group(1)
-            # append text before this escape
             parts.append(text[last_pos:start])
             last_pos = end
 
             if params == '' or params == '0':
-                # reset -> close all open spans
                 while open_spans:
                     parts.append("</span>")
                     open_spans.pop()
@@ -432,14 +404,12 @@ class ModernDarkTerminalApp(QMainWindow):
                         if color:
                             style_attrs.append(f"color:{color}")
                     elif ai == 39:
-                        # default fg
                         pass
                 if style_attrs:
                     parts.append(f"<span style=\"{';'.join(style_attrs)}\">")
                     open_spans.append(True)
 
         parts.append(text[last_pos:])
-        # close any remaining spans
         while open_spans:
             parts.append("</span>")
             open_spans.pop()
@@ -451,10 +421,9 @@ class ModernDarkTerminalApp(QMainWindow):
         prompt = f'<span style="color:#9EA7FF;font-weight:600;">{html.escape(self.username)}</span>' \
                 f'@<span style="color:#7B61FF;font-weight:600;">{html.escape(self.domain)}</span>:' \
                 f'<span style="color:#A6A6A6;">{html.escape(self.cwd)}</span>$ '
-        # ensure cursor at end then insert prompt as HTML block
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
         self.terminal.insertHtml(prompt)
-        self.terminal.insertPlainText('')  # keep cursor after HTML
+        self.terminal.insertPlainText('')
         self.terminal.moveCursor(QTextCursor.MoveOperation.End)
         
         self._last_was_output_line = False
@@ -466,16 +435,11 @@ class ModernDarkTerminalApp(QMainWindow):
         """
         cursor = self.terminal.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
-        # select last block
         cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
-        # get current block text to detect prompt boundary if present
         block_text = cursor.selectedText()
-        # If prompt visible in block, we will replace after prompt; otherwise replace whole block
         if '$' in block_text:
-            # split at last $ to preserve prompt
             idx = block_text.rfind('$')
             prompt_part = block_text[:idx+1]
-            # replace: set the block to prompt_part + our text (escape HTML)
             new_block = html.escape(prompt_part) + ' ' + html.escape(text)
             cursor.removeSelectedText()
             cursor.insertHtml(new_block)
@@ -489,8 +453,7 @@ class ModernDarkTerminalApp(QMainWindow):
         if source == self.terminal and event.type() == event.Type.KeyPress:
             key = event.key()
             mods = event.modifiers()
-            
-            # Enter: پردازش فرمان
+
             if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
                 cursor = self.terminal.textCursor()
                 cursor.movePosition(QTextCursor.MoveOperation.End)
@@ -504,12 +467,10 @@ class ModernDarkTerminalApp(QMainWindow):
                 if command:
                     self.history.append(command)
                     self.history_index = len(self.history)
-                    
-                    # جداسازی دستور اصلی
+
                     cmd_parts = command.strip().split()
                     cmd_base = cmd_parts[0].lower()
-                    
-                    # دستورات شبیه‌سازی‌شده
+
                     if cmd_base == "clear":
                         self.terminal.clear()
                         self.show_prompt()
@@ -542,7 +503,6 @@ class ModernDarkTerminalApp(QMainWindow):
                     elif cmd_base == "exit":
                         self.close()
                     else:
-                        # دستور واقعی: استفاده از CommandWorker
                         self.terminal.append("")
                         self.current_worker = CommandWorker(command, cwd=self.output_dir)
                         self.current_worker.output_signal.connect(self.handle_output)
@@ -550,13 +510,11 @@ class ModernDarkTerminalApp(QMainWindow):
                         self.current_worker.start()
                 return True
             
-            # Ctrl+L: پاک کردن ترمینال
             if key == Qt.Key.Key_L and mods == Qt.KeyboardModifier.ControlModifier:
                 self.terminal.clear()
                 self.show_prompt()
                 return True
-            
-            # Ctrl+C: copy یا interrupt پروسه جاری
+
             if key == Qt.Key.Key_C and mods == Qt.KeyboardModifier.ControlModifier:
                 cursor = self.terminal.textCursor()
                 has_selection = cursor.hasSelection()
@@ -573,20 +531,17 @@ class ModernDarkTerminalApp(QMainWindow):
                     else:
                         self.terminal.copy()
                 return True
-            
-            # Ctrl+V: paste
+
             if key == Qt.Key.Key_V and mods == Qt.KeyboardModifier.ControlModifier:
                 self.terminal.paste()
                 return True
-            
-            # Arrow Up: فرمان قبلی
+
             if key == Qt.Key.Key_Up:
                 if self.history and self.history_index > 0:
                     self.history_index -= 1
                     self.replace_current_line(self.history[self.history_index])
                 return True
-            
-            # Arrow Down: فرمان بعدی یا خط خالی
+
             if key == Qt.Key.Key_Down:
                 if self.history and self.history_index < len(self.history) - 1:
                     self.history_index += 1
@@ -618,7 +573,7 @@ class ModernDarkTerminalApp(QMainWindow):
             parts.append(text[last_pos:start])
             last_pos = end
 
-            params = m.group()[2:-1]  # remove \x1b[ and m
+            params = m.group()[2:-1]
             if params == '' or params == '0':
                 while open_spans:
                     parts.append("</span>")
@@ -671,9 +626,7 @@ class ModernDarkTerminalApp(QMainWindow):
         parts = re.split(r'(\r|\n|\[ESC_CLEAR_LINE\])', text)
 
         def append_output_line(s):
-            # append plain text + newline
             self.terminal.moveCursor(QTextCursor.MoveOperation.End)
-            # insertText on cursor is more reliable in PyQt6
             cur = self.terminal.textCursor()
             cur.movePosition(QTextCursor.MoveOperation.End)
             cur.insertText(s + '\n')
@@ -692,14 +645,12 @@ class ModernDarkTerminalApp(QMainWindow):
             block_text = cur.selectedText()
 
             if '$' in block_text and not self._last_was_output_line:
-                # there's a prompt in the block — preserve up to last '$'
                 idx = block_text.rfind('$')
-                prompt_part = block_text[:idx+1]  # include $
+                prompt_part = block_text[:idx+1]
                 new_block = prompt_part + ' ' + s
                 cur.removeSelectedText()
                 cur.insertText(new_block)
             else:
-                # last block is an output line (or no prompt found) -> replace whole block
                 cur.removeSelectedText()
                 cur.insertText(s)
             self.terminal.setTextCursor(cur)
@@ -707,25 +658,22 @@ class ModernDarkTerminalApp(QMainWindow):
             self._last_was_output_line = True
 
         def clear_last_output_line():
-            # remove the last block (output or prompt line). If it's a prompt, leave prompt only.
+
             cur = self.terminal.textCursor()
             cur.movePosition(QTextCursor.MoveOperation.End)
             cur.select(QTextCursor.SelectionType.BlockUnderCursor)
             block_text = cur.selectedText()
             if '$' in block_text and not self._last_was_output_line:
-                # keep prompt only
                 idx = block_text.rfind('$')
-                prompt_part = block_text[:idx+1]  # include $
+                prompt_part = block_text[:idx+1]
                 cur.removeSelectedText()
                 cur.insertText(prompt_part + ' ')
             else:
-                # remove whole block (makes it empty)
                 cur.removeSelectedText()
             self.terminal.setTextCursor(cur)
             self.terminal.moveCursor(QTextCursor.MoveOperation.End)
             self._last_was_output_line = False
 
-        # iterate parts and process
         buffer = ""
         last_was_newline = False
         last_was_progress = False
@@ -734,9 +682,7 @@ class ModernDarkTerminalApp(QMainWindow):
             if token == '' or token is None:
                 continue
             if token == '\n':
-                # finish current buffer as appended line
                 if buffer != "":
-                    # strip ANSI colors from buffer (so control sequences don't show up)
                     clean = strip_ansi_except_controls(buffer)
                     append_output_line(clean)
                     buffer = ""
@@ -756,7 +702,6 @@ class ModernDarkTerminalApp(QMainWindow):
                 continue
 
             if token == '[ESC_CLEAR_LINE]':
-                # clear last output line
                 clear_last_output_line()
                 buffer = ""
                 last_was_progress = False
@@ -795,29 +740,29 @@ class ModernDarkTerminalApp(QMainWindow):
             ]
         elif t == "subfinder":
             option_labels = [
-                "Passive Scan",         # 1
-                "Recursive Scan",       # 2
-                "Brute (wordlist)",     # 3
-                "Use Custom Resolvers", # 4
-                "Timeout Tuning",       # 5
-                "Threads (concurrency)",# 6
-                "All Sources",          # 7
-                "Cert-based Scan",      # 8
-                "Save JSON",            # 9
-                "Custom Template"       #10
+                "Passive Scan",         
+                "Recursive Scan",       
+                "Brute (wordlist)",     
+                "Use Custom Resolvers", 
+                "Timeout Tuning",       
+                "Threads (concurrency)",
+                "All Sources",          
+                "Cert-based Scan",      
+                "Save JSON",            
+                "Custom Template"       
             ]
         elif t == "dnsx":
             option_labels = [
-                "Basic DNS Lookup",      # 1
-                "A + AAAA Records",      # 2
-                "CNAME Lookup",          # 3
-                "MX / TXT Records",      # 4
-                "Use Custom Resolvers",  # 5
-                "Wildcard Detection",    # 6
-                "Brute (wordlist)",      # 7
-                "Port/Service Probe",    # 8
-                "Save JSON",             # 9
-                "Custom Template"        #10
+                "Basic DNS Lookup",      
+                "A + AAAA Records",      
+                "CNAME Lookup",          
+                "MX / TXT Records",      
+                "Use Custom Resolvers",  
+                "Wildcard Detection",   
+                "Brute (wordlist)",      
+                "Port/Service Probe",    
+                "Save JSON",             
+                "Custom Template"        
             ]
         else:
             option_labels = [
@@ -1005,130 +950,104 @@ class ModernDarkTerminalApp(QMainWindow):
                 cmd = f'httpx -u https://{domain}/path -o "{out}"'
                 self.replace_current_line(cmd)
 
-        #------- Subfinder-specific options (NEW) -------
-         
+
         elif tool_name.lower() == "subfinder":
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
-            # common output filenames inside output_dir
             if option_index == 1:
-                # Passive scan (default sources)
                 out = os.path.join(self.output_dir, f"subfinder_passive_{domain}.txt")
                 cmd = f"subfinder -d {domain} -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 2:
-                # Recursive enumeration
                 out = os.path.join(self.output_dir, f"subfinder_recursive_{domain}.txt")
                 cmd = f"subfinder -d {domain} -recursive -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 3:
-                # Brute force using a wordlist (uses self.wordlist_path)
                 out = os.path.join(self.output_dir, f"subfinder_brute_{domain}.txt")
                 cmd = f"subfinder -d {domain} -brute -w \"{self.wordlist_path}\" -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 4:
-                # Use custom resolvers file (resolvers.txt expected)
                 resolvers = "resolvers.txt"
                 out = os.path.join(self.output_dir, f"subfinder_resolvers_{domain}.txt")
                 cmd = f"subfinder -d {domain} -o \"{out}\" -r \"{resolvers}\""
                 self.replace_current_line(cmd)
             elif option_index == 5:
-                # Timeout tuning
                 out = os.path.join(self.output_dir, f"subfinder_timeout_{domain}.txt")
                 cmd = f"subfinder -d {domain} -timeout 10 -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 6:
-                # Threads / concurrency
                 out = os.path.join(self.output_dir, f"subfinder_threads_{domain}.txt")
                 cmd = f"subfinder -d {domain} -t 50 -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 7:
-                # Use all sources (exhaustive)
                 out = os.path.join(self.output_dir, f"subfinder_all_{domain}.txt")
                 cmd = f"subfinder -d {domain} -all -o \"{out}\""
                 self.replace_current_line(cmd)
             elif option_index == 8:
-                # Certificate transparency based scan
                 out = os.path.join(self.output_dir, f"subfinder_cert_{domain}.txt")
                 cmd = f"subfinder -d {domain} -o \"{out}\" -crt"
                 self.replace_current_line(cmd)
             elif option_index == 9:
-                # Save JSON output
                 out = os.path.join(self.output_dir, f"subfinder_{domain}.json")
                 cmd = f"subfinder -d {domain} -o \"{out}\" -oJ"
                 self.replace_current_line(cmd)
             elif option_index == 10:
-                # Custom template for user editing
                 out = os.path.join(self.output_dir, f"subfinder_custom_{domain}.txt")
                 cmd = f"subfinder -d {domain} -o \"{out}\""
                 self.replace_current_line(cmd)
-        # ------- DNSX-specific options (NEW) -------
-    # ------- DNSX-specific options (NEW) -------
+                
         elif tool_name.lower() == "dnsx":
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
-            # filenames in output_dir
             if option_index == 1:
-                # Basic DNS lookup (default)
                 out = os.path.join(self.output_dir, f"dnsx_basic_{domain}.txt")
                 cmd = f'dnsx -d {domain} -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 2:
-                # A + AAAA records
                 out = os.path.join(self.output_dir, f"dnsx_a_aaaa_{domain}.txt")
                 cmd = f'dnsx -d {domain} -a -aaaa -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 3:
-                # CNAME lookup
                 out = os.path.join(self.output_dir, f"dnsx_cname_{domain}.txt")
                 cmd = f'dnsx -d {domain} -cname -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 4:
-                # MX and TXT records
                 out = os.path.join(self.output_dir, f"dnsx_mx_txt_{domain}.txt")
                 cmd = f'dnsx -d {domain} -mx -txt -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 5:
-                # Use custom resolvers file (resolvers.txt)
                 resolvers = "resolvers.txt"
                 out = os.path.join(self.output_dir, f"dnsx_resolvers_{domain}.txt")
                 cmd = f'dnsx -d {domain} -r "{resolvers}" -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 6:
-                # Wildcard detection (common technique: query random subdomains)
                 out = os.path.join(self.output_dir, f"dnsx_wildcard_{domain}.txt")
-                cmd = f'python3 -c "print(\'generate-check\')" && dnsx -d {domain} -silent -o \"{out}\"'  # placeholder pattern
-                # note: user may want a real wildcard-check flow; this is a template
+                cmd = f'python3 -c "print(\'generate-check\')" && dnsx -d {domain} -silent -o \"{out}\"'
                 self.replace_current_line(cmd)
 
             elif option_index == 7:
-                # Brute force subdomains using provided wordlist
                 out = os.path.join(self.output_dir, f"dnsx_brute_{domain}.txt")
                 cmd = f'dnsx -d {domain} -w "{self.wordlist_path}" -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 8:
-                # Port/service probe (pipe results to httpx or use -resp if supported)
                 out = os.path.join(self.output_dir, f"dnsx_probe_{domain}.txt")
                 cmd = f'dnsx -d {domain} -a -o "{out}" | httpx -silent -o "{os.path.join(self.output_dir, f"httpx_from_dnsx_{domain}.txt")}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 9:
-                # Save JSON (if dnsx supports json / wrapper)
                 out = os.path.join(self.output_dir, f"dnsx_{domain}.json")
-                cmd = f'dnsx -d {domain} -o "{out}"'  # change to JSON flag if available
+                cmd = f'dnsx -d {domain} -o "{out}"'
                 self.replace_current_line(cmd)
 
             elif option_index == 10:
-                # Custom template for user editing
                 out = os.path.join(self.output_dir, f"dnsx_custom_{domain}.txt")
                 cmd = f'# Custom dnsx: dnsx -d {domain} -o \"{out}\"'
                 self.replace_current_line(cmd)
 
-        # ------- Fallback: other tools or default templates -------
         else:
             if tool_name.lower() == "httpx":
                 cmd = f'httpx -u {self.domain} -o {self.output_filename}'
@@ -1175,11 +1094,9 @@ class CommandWorker(QThread):
                     preexec_fn=os.setsid
                 )
 
-            # خواندن خروجی خط به خط
             for line in iter(self.process.stdout.readline, ''):
                 if line is None:
                     break
-                # ارسال هر خط به UI
                 self.output_signal.emit(line.rstrip('\n'))
             if self.process.stdout:
                 self.process.stdout.close()
@@ -1188,7 +1105,6 @@ class CommandWorker(QThread):
             self.output_signal.emit(f"[Error] {str(e)}")
         finally:
             self.finished_signal.emit()
-            # پس از اتمام، null کردن مرجع پروسه
             try:
                 self.process = None
             except Exception:
@@ -1205,17 +1121,14 @@ class CommandWorker(QThread):
         try:
             is_windows = platform.system() == "Windows"
             if is_windows:
-                # ارسال CTRL_BREAK_EVENT به گروه پروسه (نیاز به CREATE_NEW_PROCESS_GROUP)
                 try:
                     self.process.send_signal(signal.CTRL_BREAK_EVENT)
                 except Exception:
-                    # fallback: terminate
                     try:
                         self.process.terminate()
                     except Exception:
                         pass
             else:
-                # POSIX: سیگنال به whole process group
                 try:
                     os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
                 except Exception:
