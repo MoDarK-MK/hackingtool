@@ -725,8 +725,8 @@ class ModernDarkTerminalApp(QMainWindow):
             "Depth Fuzz",
             "Human Fuzz",
             "Regex Fuzz",
-            "Option 9",
-            "Option 10"
+            "Multi Fuzz",
+            "Suggested Command"
         ]
 
         for idx, label in enumerate(option_labels, start=1):
@@ -772,6 +772,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f'ffuf -u "{url}" -w "{wordlist}" -t 50 -o "{output_path}" -of json'
             self.replace_current_line(cmd)
+            
         elif option_index == 2:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
@@ -780,6 +781,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f'ffuf -u "{url}" -w "{wordlist}" -e {extensions} -t 40 -o "{output_path}" -mc 200-500 -of json'
             self.replace_current_line(cmd)
+            
         elif option_index == 3:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/search.php?FUZZ=1"
@@ -787,6 +789,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w {wordlist} -t 40 -mc 200-500 -o {output_path} -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 4:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/"
@@ -794,6 +797,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u {url} -H 'Host: FUZZ.{domain}' -w {wordlist} -t 80 -mc 200 -o {output_path} -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 5:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/login"
@@ -801,6 +805,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u {url} -d 'username=admin&password=FUZZ' -X POST -w {wordlist} -H 'Content-Type: application/x-www-form-urlencoded' -t 30 -mc 200,302 -o {output_path} -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 6:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
@@ -809,6 +814,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -recursion -recursion-depth 2 -t 50 -e '{extensions}' -o '{output_path}' -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 7:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
@@ -816,6 +822,7 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -t 30 -rate 50 -timeout 10 -o '{output_path}' -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 8:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
@@ -823,12 +830,21 @@ class ModernDarkTerminalApp(QMainWindow):
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u '{url}' -w '{wordlist}' -fs 0 -fw 5 'f'-mr 'index of|Directory listing' -o '{output_path}' -of json"
             self.replace_current_line(cmd)
+            
         elif option_index == 9:
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
             url = f"https://{domain}/FUZZ"
             wordlist = self.wordlist_path
             output_path = os.path.join(self.output_dir, self.output_filename)
             cmd = f"ffuf -u 'https://{domain}/FUZZ' -H 'X-Api-Token: FUZZ2' -w '{wordlist}':FUZZ -w '{wordlist}':FUZZ2 -t 60 -mc 200 -o '{output_path}' -of json"
+            self.replace_current_line(cmd)
+            
+        elif option_index == 10:
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            url = f"https://{domain}/FUZZ"
+            wordlist = self.wordlist_path
+            output_path = os.path.join(self.output_dir, self.output_filename)
+            cmd = f"ffuf -c -w {wordlist}  -u http://{domain}/FUZZ -of json"
             self.replace_current_line(cmd)
 
 
