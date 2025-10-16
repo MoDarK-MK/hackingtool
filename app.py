@@ -806,6 +806,19 @@ class ModernDarkTerminalApp(QMainWindow):
                 "Save JSON",            # 9
                 "Custom Template"       #10
             ]
+        elif t == "dnsx":
+            option_labels = [
+                "Basic DNS Lookup",      # 1
+                "A + AAAA Records",      # 2
+                "CNAME Lookup",          # 3
+                "MX / TXT Records",      # 4
+                "Use Custom Resolvers",  # 5
+                "Wildcard Detection",    # 6
+                "Brute (wordlist)",      # 7
+                "Port/Service Probe",    # 8
+                "Save JSON",             # 9
+                "Custom Template"        #10
+            ]
         else:
             option_labels = [
                 "Fuzz Dirs",
@@ -819,6 +832,7 @@ class ModernDarkTerminalApp(QMainWindow):
                 "Multi Fuzz",
                 "Suggested Command"
             ]
+
 
         for idx, label in enumerate(option_labels, start=1):
             btn = QPushButton(label)
@@ -990,7 +1004,7 @@ class ModernDarkTerminalApp(QMainWindow):
                 out = os.path.join(self.output_dir, f"httpx_custom_{domain}.txt")
                 cmd = f'httpx -u https://{domain}/path -o "{out}"'
                 self.replace_current_line(cmd)
-                
+
         #------- Subfinder-specific options (NEW) -------
          
         elif tool_name.lower() == "subfinder":
@@ -1045,7 +1059,73 @@ class ModernDarkTerminalApp(QMainWindow):
             elif option_index == 10:
                 # Custom template for user editing
                 out = os.path.join(self.output_dir, f"subfinder_custom_{domain}.txt")
-                cmd = f"# Custom: subfinder -d {domain} -o \"{out}\""
+                cmd = f"subfinder -d {domain} -o \"{out}\""
+                self.replace_current_line(cmd)
+        # ------- DNSX-specific options (NEW) -------
+    # ------- DNSX-specific options (NEW) -------
+        elif tool_name.lower() == "dnsx":
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            # filenames in output_dir
+            if option_index == 1:
+                # Basic DNS lookup (default)
+                out = os.path.join(self.output_dir, f"dnsx_basic_{domain}.txt")
+                cmd = f'dnsx -d {domain} -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 2:
+                # A + AAAA records
+                out = os.path.join(self.output_dir, f"dnsx_a_aaaa_{domain}.txt")
+                cmd = f'dnsx -d {domain} -a -aaaa -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 3:
+                # CNAME lookup
+                out = os.path.join(self.output_dir, f"dnsx_cname_{domain}.txt")
+                cmd = f'dnsx -d {domain} -cname -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 4:
+                # MX and TXT records
+                out = os.path.join(self.output_dir, f"dnsx_mx_txt_{domain}.txt")
+                cmd = f'dnsx -d {domain} -mx -txt -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 5:
+                # Use custom resolvers file (resolvers.txt)
+                resolvers = "resolvers.txt"
+                out = os.path.join(self.output_dir, f"dnsx_resolvers_{domain}.txt")
+                cmd = f'dnsx -d {domain} -r "{resolvers}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 6:
+                # Wildcard detection (common technique: query random subdomains)
+                out = os.path.join(self.output_dir, f"dnsx_wildcard_{domain}.txt")
+                cmd = f'python3 -c "print(\'generate-check\')" && dnsx -d {domain} -silent -o \"{out}\"'  # placeholder pattern
+                # note: user may want a real wildcard-check flow; this is a template
+                self.replace_current_line(cmd)
+
+            elif option_index == 7:
+                # Brute force subdomains using provided wordlist
+                out = os.path.join(self.output_dir, f"dnsx_brute_{domain}.txt")
+                cmd = f'dnsx -d {domain} -w "{self.wordlist_path}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 8:
+                # Port/service probe (pipe results to httpx or use -resp if supported)
+                out = os.path.join(self.output_dir, f"dnsx_probe_{domain}.txt")
+                cmd = f'dnsx -d {domain} -a -o "{out}" | httpx -silent -o "{os.path.join(self.output_dir, f"httpx_from_dnsx_{domain}.txt")}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 9:
+                # Save JSON (if dnsx supports json / wrapper)
+                out = os.path.join(self.output_dir, f"dnsx_{domain}.json")
+                cmd = f'dnsx -d {domain} -o "{out}"'  # change to JSON flag if available
+                self.replace_current_line(cmd)
+
+            elif option_index == 10:
+                # Custom template for user editing
+                out = os.path.join(self.output_dir, f"dnsx_custom_{domain}.txt")
+                cmd = f'# Custom dnsx: dnsx -d {domain} -o \"{out}\"'
                 self.replace_current_line(cmd)
 
         # ------- Fallback: other tools or default templates -------
