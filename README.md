@@ -1,0 +1,57 @@
+### HackingTool with UI🥇
+![](https://img.shields.io/github/license/Z4nzu/hackingtool)
+![](https://img.shields.io/github/issues/Z4nzu/hackingtool)
+![](https://img.shields.io/github/issues-closed/Z4nzu/hackingtool)
+![](https://img.shields.io/badge/Python-3-blue)
+![](https://img.shields.io/github/forks/Z4nzu/hackingtool)
+![](https://img.shields.io/github/stars/Z4nzu/hackingtool)
+![](https://img.shields.io/github/last-commit/Z4nzu/hackingtool)
+[![HitCount](http://hits.dwyl.com/Z4nzu/hackingtool.svg)](http://hits.dwyl.com/Z4nzu/hackingtool)
+![](https://img.shields.io/badge/platform-Linux%20%7C%20KaliLinux%20%7C%20ParrotOs-blue)
+
+## Update Available 🚀
+- [✔] Installation Bug Fixed
+
+## Tools 
+- [✔] httpx
+- [✔] ffuf
+- [✔] nuclei
+- [✔] dnsx
+- [✔] subfinder
+
+
+![](https://github.com/Z4nzu/hackingtool/blob/master/images/A.png)
+
+
+## Installation For Linux <img src="https://konpa.github.io/devicon/devicon.git/icons/linux/linux-original.svg" alt="linux" width="25" height="25"/></p><p align="center">
+
+
+### !! RUN HACKINGTOOL AS ROOT !! 
+
+
+## Steps are given below : 
+
+
+## Step : 1 Download hackingtool
+
+    git clone https://github.com/MoDarK-MK/hackingtool.git
+
+## Step : 2 Move to hackingtool directory Give Permission to hackingtool
+    
+    cd hackingtool 
+
+## Step : 3 Give Permission to hackingtool
+
+    chmod +x install.py
+
+## Step : 4 Run hackingtool
+    
+    sudo python install.py
+
+
+## Use image with Docker
+
+
+#### Don't Forgot to share with Your Friends 
+### The new Update get will soon stay updated
+#### Thank you..!!
