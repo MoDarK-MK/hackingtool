@@ -1,12 +1,12 @@
 ### HackingTool with UI🥇
-![](https://img.shields.io/github/license/Z4nzu/hackingtool)
-![](https://img.shields.io/github/issues/Z4nzu/hackingtool)
-![](https://img.shields.io/github/issues-closed/Z4nzu/hackingtool)
+![](https://img.shields.io/github/license/MoDarK-MK/hackingtool)
+![](https://img.shields.io/github/issues/MoDarK-MK/hackingtool)
+![](https://img.shields.io/github/issues-closed/MoDarK-MK/hackingtool)
 ![](https://img.shields.io/badge/Python-3-blue)
-![](https://img.shields.io/github/forks/Z4nzu/hackingtool)
-![](https://img.shields.io/github/stars/Z4nzu/hackingtool)
-![](https://img.shields.io/github/last-commit/Z4nzu/hackingtool)
-[![HitCount](http://hits.dwyl.com/Z4nzu/hackingtool.svg)](http://hits.dwyl.com/Z4nzu/hackingtool)
+![](https://img.shields.io/github/forks/MoDarK-MK/hackingtool)
+![](https://img.shields.io/github/stars/MoDarK-MK/hackingtool)
+![](https://img.shields.io/github/last-commit/MoDarK-MK/hackingtool)
+[![HitCount](http://hits.dwyl.com/MoDarK-MK/hackingtool.svg)](http://hits.dwyl.com/ZMoDarK-MK/hackingtool)
 ![](https://img.shields.io/badge/platform-Linux%20%7C%20KaliLinux%20%7C%20ParrotOs-blue)
 
 ## Update Available 🚀
@@ -20,7 +20,7 @@
 - [✔] subfinder
 
 
-![](https://github.com/Z4nzu/hackingtool/blob/master/images/A.png)
+![](https://github.com/MoDarK-MK/hackingtool/blob/master/images/A.png)
 
 
 ## Installation For Linux <img src="https://konpa.github.io/devicon/devicon.git/icons/linux/linux-original.svg" alt="linux" width="25" height="25"/></p><p align="center">
