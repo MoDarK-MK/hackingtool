@@ -6,122 +6,17 @@ import html
 import subprocess
 import re
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QFrame, QPlainTextEdit, QLabel, QScrollArea,
-    QDialog, QLineEdit, QFileDialog, QMessageBox , QTextEdit
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QFrame, QScrollArea,
+    QDialog, QLineEdit, QFileDialog, QMessageBox , QTextEdit,
+    QLabel, QPlainTextEdit,QApplication
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
 from PyQt6.QtGui import QTextCursor, QGuiApplication
 from PyQt6.QtCore import QThread, pyqtSignal
-
-ANSI_SGR_COLORS = {
-        30: "black", 31: "red", 32: "green", 33: "orange", 34: "blue",
-        35: "magenta", 36: "cyan", 37: "lightgray", 90: "gray",
-        91: "lightcoral", 92: "lightgreen", 93: "yellow", 94: "lightskyblue",
-        95: "plum", 96: "paleturquoise", 97: "white"
-    }
-
-class InitialSetupDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Initial Setup")
-        self.setFixedSize(420, 260)
-        self.center(parent)
-
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        self.domain_label = QLabel("Domain:")
-        self.domain_input = QLineEdit()
-        layout.addWidget(self.domain_label)
-        layout.addWidget(self.domain_input)
-
-        self.wordlist_label = QLabel("Path to wordlist (file):")
-        wordlist_h = QHBoxLayout()
-        self.wordlist_input = QLineEdit()
-        self.wordlist_browse = QPushButton("Browse")
-        self.wordlist_browse.clicked.connect(self.browse_wordlist)
-        wordlist_h.addWidget(self.wordlist_input)
-        wordlist_h.addWidget(self.wordlist_browse)
-        layout.addWidget(self.wordlist_label)
-        layout.addLayout(wordlist_h)
-
-        self.output_dir_label = QLabel("Output directory:")
-        output_h = QHBoxLayout()
-        self.output_dir_input = QLineEdit()
-        self.output_dir_browse = QPushButton("Browse")
-        self.output_dir_browse.clicked.connect(self.browse_output_dir)
-        output_h.addWidget(self.output_dir_input)
-        output_h.addWidget(self.output_dir_browse)
-        layout.addWidget(self.output_dir_label)
-        layout.addLayout(output_h)
-
-        self.output_name_label = QLabel("Output filename (e.g. results.txt):")
-        self.output_name_input = QLineEdit()
-        layout.addWidget(self.output_name_label)
-        layout.addWidget(self.output_name_input)
-
-        btn_h = QHBoxLayout()
-        btn_h.addStretch()
-        self.submit_btn = QPushButton("Submit")
-        self.submit_btn.clicked.connect(self.on_submit)
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.clicked.connect(self.reject)
-        btn_h.addWidget(self.cancel_btn)
-        btn_h.addWidget(self.submit_btn)
-        layout.addLayout(btn_h)
-
-        self.result = None
-
-    def center(self, parent):
-        """Center the dialog on parent if available, otherwise on primary screen."""
-        if parent is not None:
-            parent_rect = parent.frameGeometry()
-            parent_center = parent_rect.center()
-        else:
-            screen = QGuiApplication.primaryScreen()
-            parent_center = screen.availableGeometry().center()
-
-        top_left = QPoint(parent_center.x() - self.width() // 2,
-                          parent_center.y() - self.height() // 2)
-        self.move(top_left)
-
-    def browse_wordlist(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select wordlist file")
-        if path:
-            self.wordlist_input.setText(path)
-
-    def browse_output_dir(self):
-        path = QFileDialog.getExistingDirectory(self, "Select output directory")
-        if path:
-            self.output_dir_input.setText(path)
-
-    def on_submit(self):
-        domain = self.domain_input.text().strip()
-        wordlist = self.wordlist_input.text().strip()
-        outdir = self.output_dir_input.text().strip()
-        outname = self.output_name_input.text().strip()
-
-        if not domain:
-            QMessageBox.warning(self, "Validation", "Domain is required.")
-            return
-        if not wordlist or not os.path.isfile(wordlist):
-            QMessageBox.warning(self, "Validation", "Valid wordlist file is required.")
-            return
-        if not outdir or not os.path.isdir(outdir):
-            QMessageBox.warning(self, "Validation", "Valid output directory is required.")
-            return
-        if not outname:
-            QMessageBox.warning(self, "Validation", "Output filename is required.")
-            return
-
-        self.result = {
-            "domain": domain,
-            "wordlist": wordlist,
-            "output_dir": outdir,
-            "output_name": outname
-        }
-        self.accept()
+from command_worker import CommandWorker
+from utils import ANSI_SGR_COLORS, ansi_to_html
+from setup_dialog import InitialSetupDialog
 
 class ModernDarkTerminalApp(QMainWindow):
     def __init__(self):
@@ -324,7 +219,6 @@ class ModernDarkTerminalApp(QMainWindow):
         self.terminal.insertPlainText(f"[info] wordlist updated: {self.wordlist_path}\n")
         QMessageBox.information(self, "Wordlist Updated", f"New wordlist set to:\n{self.wordlist_path}")
 
-
     def add_main_buttons(self):
         for i in reversed(range(self.scroll_layout.count())):
             widget = self.scroll_layout.itemAt(i).widget()
@@ -365,55 +259,6 @@ class ModernDarkTerminalApp(QMainWindow):
             self.sidebar_animation.setEndValue(220)
         self.sidebar_animation.start()
         self.sidebar_expanded = not self.sidebar_expanded
-
-
-    def ansi_to_html(text: str) -> str:
-        """
-        Very small ANSI SGR -> HTML converter.
-        Handles sequences like \x1b[31m (red) and \x1b[0m (reset) and bold (1).
-        Other sequences are removed.
-        """
-        text = html.escape(text)
-        sgr_re = re.compile(r'\\x1B\\[([0-9;]*)m')
-        parts = []
-        last_pos = 0
-        open_spans = []
-
-        for m in sgr_re.finditer(text):
-            start, end = m.span()
-            params = m.group(1)
-            parts.append(text[last_pos:start])
-            last_pos = end
-
-            if params == '' or params == '0':
-                while open_spans:
-                    parts.append("</span>")
-                    open_spans.pop()
-            else:
-                attrs = params.split(';')
-                style_attrs = []
-                for a in attrs:
-                    try:
-                        ai = int(a)
-                    except:
-                        continue
-                    if ai == 1:
-                        style_attrs.append("font-weight:700")
-                    elif 30 <= ai <= 37 or 90 <= ai <= 97:
-                        color = ANSI_SGR_COLORS.get(ai, None)
-                        if color:
-                            style_attrs.append(f"color:{color}")
-                    elif ai == 39:
-                        pass
-                if style_attrs:
-                    parts.append(f"<span style=\"{';'.join(style_attrs)}\">")
-                    open_spans.append(True)
-
-        parts.append(text[last_pos:])
-        while open_spans:
-            parts.append("</span>")
-            open_spans.pop()
-        return ''.join(parts).replace('\\n', '<br/>').replace('  ', '&nbsp;&nbsp;')
 
     def show_prompt(self):
         """Append a prompt line using HTML so colors/formatting can be used."""
@@ -552,55 +397,6 @@ class ModernDarkTerminalApp(QMainWindow):
                 return True
 
         return False
-
-
-    def ansi_to_html(self, text: str) -> str:
-        ANSI_SGR_COLORS = {
-            30: "black", 31: "red", 32: "green", 33: "orange", 34: "blue",
-            35: "magenta", 36: "cyan", 37: "lightgray", 90: "gray",
-            91: "lightcoral", 92: "lightgreen", 93: "yellow", 94: "lightskyblue",
-            95: "plum", 96: "paleturquoise", 97: "white"
-        }
-
-        text = html.escape(text)
-        sgr_re = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
-        parts = []
-        last_pos = 0
-        open_spans = []
-
-        for m in sgr_re.finditer(text):
-            start, end = m.span()
-            parts.append(text[last_pos:start])
-            last_pos = end
-
-            params = m.group()[2:-1]
-            if params == '' or params == '0':
-                while open_spans:
-                    parts.append("</span>")
-                    open_spans.pop()
-            else:
-                attrs = params.split(';')
-                style_attrs = []
-                for a in attrs:
-                    try:
-                        ai = int(a)
-                    except:
-                        continue
-                    if ai == 1:
-                        style_attrs.append("font-weight:700")
-                    elif 30 <= ai <= 37 or 90 <= ai <= 97:
-                        color = ANSI_SGR_COLORS.get(ai, None)
-                        if color:
-                            style_attrs.append(f"color:{color}")
-                if style_attrs:
-                    parts.append(f"<span style=\"{';'.join(style_attrs)}\">")
-                    open_spans.append(True)
-
-        parts.append(text[last_pos:])
-        while open_spans:
-            parts.append("</span>")
-            open_spans.pop()
-        return ''.join(parts).replace('\n', '<br/>').replace('  ', '&nbsp;&nbsp;')
 
 
     def handle_output(self, raw_text):
@@ -1058,89 +854,3 @@ class ModernDarkTerminalApp(QMainWindow):
     def back_to_main(self):
         self.header_label.setText("")
         self.add_main_buttons()
-        
-class CommandWorker(QThread):
-    output_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal()
-
-    def __init__(self, command, cwd=None):
-        super().__init__()
-        self.command = command
-        self.cwd = cwd
-        self.process = None
-
-    def run(self):
-        try:
-            is_windows = platform.system() == "Windows"
-            if is_windows:
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-                self.process = subprocess.Popen(
-                    self.command,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    cwd=self.cwd,
-                    creationflags=creationflags
-                )
-            else:
-                self.process = subprocess.Popen(
-                    self.command,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    cwd=self.cwd,
-                    preexec_fn=os.setsid
-                )
-
-            for line in iter(self.process.stdout.readline, ''):
-                if line is None:
-                    break
-                self.output_signal.emit(line.rstrip('\n'))
-            if self.process.stdout:
-                self.process.stdout.close()
-            self.process.wait()
-        except Exception as e:
-            self.output_signal.emit(f"[Error] {str(e)}")
-        finally:
-            self.finished_signal.emit()
-            try:
-                self.process = None
-            except Exception:
-                pass
-
-    def interrupt(self):
-        """
-        سعی می‌کنیم SIGINT یا معادلش رو به پروسه/گروه پروسه بفرستیم.
-        اگر نشد، fallback به terminate.
-        """
-        if not self.process:
-            return
-
-        try:
-            is_windows = platform.system() == "Windows"
-            if is_windows:
-                try:
-                    self.process.send_signal(signal.CTRL_BREAK_EVENT)
-                except Exception:
-                    try:
-                        self.process.terminate()
-                    except Exception:
-                        pass
-            else:
-                try:
-                    os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
-                except Exception:
-                    try:
-                        self.process.terminate()
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ModernDarkTerminalApp()
-    window.show()
-    sys.exit(app.exec())
