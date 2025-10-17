@@ -20,7 +20,9 @@
 - [✔] subfinder
 
 
-![](https://github.com/MoDarK-MK/hackingtool/blob/master/images/A.png)
+![](https://github.com/MoDarK-MK/hackingtool/images/A.png)
+![](https://github.com/MoDarK-MK/hackingtool/images/AA.png)
+![](https://github.com/MoDarK-MK/hackingtool/images/AAA.png)
 
 
 ## Installation For Linux <img src="https://konpa.github.io/devicon/devicon.git/icons/linux/linux-original.svg" alt="linux" width="25" height="25"/></p><p align="center">
