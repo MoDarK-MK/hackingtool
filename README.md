@@ -6,7 +6,7 @@
 ![](https://img.shields.io/github/forks/MoDarK-MK/hackingtool)
 ![](https://img.shields.io/github/stars/MoDarK-MK/hackingtool)
 ![](https://img.shields.io/github/last-commit/MoDarK-MK/hackingtool)
-[![HitCount](http://hits.dwyl.com/MoDarK-MK/hackingtool.svg)](http://hits.dwyl.com/ZMoDarK-MK/hackingtool)
+![](http://hits.dwyl.com/ZMoDarK-MK/hackingtool)
 ![](https://img.shields.io/badge/platform-Linux%20%7C%20KaliLinux%20%7C%20ParrotOs-blue)
 
 ## Update Available 🚀
