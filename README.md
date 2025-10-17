@@ -20,9 +20,9 @@
 - [✔] subfinder
 
 
-![](https://github.com/MoDarK-MK/hackingtool/images/A.png)
-![](https://github.com/MoDarK-MK/hackingtool/images/AA.png)
-![](https://github.com/MoDarK-MK/hackingtool/images/AAA.png)
+![](https://github.com/MoDarK-MK/hackingtool/tree/main/imagesA.png)
+![](https://github.com/MoDarK-MK/hackingtool/tree/main/imagesAA.png)
+![](https://github.com/MoDarK-MK/hackingtool/tree/main/imagesAAA.png)
 
 
 ## Installation For Linux
