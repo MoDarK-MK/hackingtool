@@ -20,6 +20,7 @@ from setup_dialog import InitialSetupDialog
 
 class ModernDarkTerminalApp(QMainWindow):
     def __init__(self):
+        self.nuclei_templates_path = os.path.expanduser("~/nuclei-templates")
         self._last_was_output_line = False
         super().__init__()
 
@@ -592,7 +593,22 @@ class ModernDarkTerminalApp(QMainWindow):
             """)
             btn.clicked.connect(lambda checked, i=idx, t=tool_name: self.on_option_click(t, i))
             self.scroll_layout.addWidget(btn)
-
+            
+        set_templates_btn = QPushButton("Set Nuclei Templates Path")
+        set_templates_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #7B61FF;
+                color: white;
+                font-size: 14px;
+                border-radius: 12px;
+                padding: 8px 15px;
+            }
+            QPushButton:hover {
+                background-color: #9E7CFF;
+            }
+        """)
+        set_templates_btn.clicked.connect(self.set_nuclei_templates_path)
+        self.scroll_layout.addWidget(set_templates_btn)
         back_btn = QPushButton("Back")
         back_btn.setStyleSheet("""
             QPushButton {
@@ -610,6 +626,18 @@ class ModernDarkTerminalApp(QMainWindow):
         self.scroll_layout.addWidget(back_btn)
 
 
+    def set_nuclei_templates_path(self):
+        """
+        Ask user to pick a directory for nuclei templates and store it.
+        """
+        start_dir = self.nuclei_templates_path if os.path.isdir(self.nuclei_templates_path) else os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(self, "Select Nuclei templates directory", start_dir)
+        if not path:
+            return
+        self.nuclei_templates_path = path
+        QMessageBox.information(self, "Nuclei templates set", f"Nuclei templates path set to:\n{self.nuclei_templates_path}")
+        self.terminal.append("")
+        self.terminal.insertPlainText(f"[info] nuclei templates: {self.nuclei_templates_path}\n")
 
     def on_option_click(self, tool_name, option_index):
         if tool_name.lower() == "fuzzer" and option_index == 1:
@@ -691,6 +719,60 @@ class ModernDarkTerminalApp(QMainWindow):
             cmd = f"ffuf -c -w {wordlist}  -u http://{domain}/FUZZ -of json"
             self.replace_current_line(cmd)
         
+        elif tool_name.lower() == "nuclei":
+            domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
+            output_base = os.path.join(self.output_dir, f"nuclei_{domain}")
+            templates = self.nuclei_templates_path
+
+            if option_index == 1:
+                out = f"{output_base}_all.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{templates}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 2:
+                out = f"{output_base}_vulnerabilities.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "vulnerabilities")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 3:
+                out = f"{output_base}_exposures.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "exposures")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 4:
+                out = f"{output_base}_files.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "files")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 5:
+                out = f"{output_base}_takeovers.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "takeovers")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 6:
+                out = f"{output_base}_misconfigurations.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "misconfiguration")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 7:
+                out = f"{output_base}_credentials.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "credentials")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 8:
+                out = f"{output_base}_leaks.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{templates}" -tags "leak" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 9:
+                out = f"{output_base}_custom.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{os.path.join(templates, "custom")}" -o "{out}"'
+                self.replace_current_line(cmd)
+
+            elif option_index == 10:
+                out = f"{output_base}_quick_scan.txt"
+                cmd = f'nuclei -u "https://{domain}" -t "{templates}" -severity "critical,high" -c 25 -o "{out}"'
+                self.replace_current_line(cmd)
 
         elif tool_name.lower() == "httpx":
             domain = re.sub(r'^https?://', '', self.domain.strip()).rstrip('/')
